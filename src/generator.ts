@@ -54,8 +54,12 @@ export class Generator<T> {
   }
 
   generate(constraints: SchemaConstraints): AnyObject {
-    for (const [path, constraint] of Object.entries(constraints))
-      this.#doc[path] = this.#value(constraint);
+    for (const [path, constraint] of Object.entries(constraints)) {
+      const value = this.#value(constraint);
+
+      if (constraint.set) this.#doc[path] = constraint.set(value);
+      else this.#doc[path] = value;
+    }
 
     if (Object.keys(this.#labels).length > 0) this.#resolve_timestamps();
 

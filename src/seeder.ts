@@ -1,6 +1,7 @@
 import type { AnyObject, Model } from "mongoose";
 import { SchemaAnalyzer, type AnalyzerOptions } from "./schema-analyzer.js";
 import { Generator, type GeneratorOptions } from "./generator.js";
+import { Limbo } from "../dev/model.js";
 import { faker } from "@faker-js/faker";
 
 interface SeedOptions<T> extends AnalyzerOptions, GeneratorOptions<T> {
@@ -32,3 +33,16 @@ export const seed = async <T>(model: Model<T>, options: SeedOptions<T>) => {
 
   return documents;
 };
+
+console.dir(
+  await seed(Limbo, {
+    quantity: 1,
+    exclude: ["oid", "scheme", "buffer", "dec128"],
+    timestamps: true,
+    optional_field_probability: 1,
+    generators: {}
+  }),
+  {
+    depth: Infinity
+  }
+);

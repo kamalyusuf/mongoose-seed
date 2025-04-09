@@ -30,6 +30,7 @@ export class SchemaAnalyzer {
           type: type.instance,
           default: options.default,
           required,
+          set: options.set,
           schema: this.constraints(type.schema)
         };
       else if (type.instance === "Array") {
@@ -42,6 +43,7 @@ export class SchemaAnalyzer {
             type: type.instance,
             required,
             default: options.default,
+            set: options.set,
             of: this.constraints(caster.schema)
           };
         else if (caster.instance === "Array")
@@ -51,6 +53,7 @@ export class SchemaAnalyzer {
             type: type.instance,
             required,
             default: options.default,
+            set: options.set,
             of: this.#nested_array(caster)
           };
         else {
@@ -59,6 +62,7 @@ export class SchemaAnalyzer {
             path,
             type: type.instance,
             required,
+            set: options.set,
             of: caster.instance
           };
         }
@@ -76,6 +80,7 @@ export class SchemaAnalyzer {
           type: "Map",
           required,
           default: options.default,
+          set: options.set,
           of: oftype
         };
       } else if (type.instance === "String")
@@ -84,6 +89,7 @@ export class SchemaAnalyzer {
           type: type.instance,
           default: options.default,
           required,
+          set: options.set,
           trim: options.trim,
           lowercase: options.lowercase,
           uppercase: options.uppercase,
@@ -114,6 +120,7 @@ export class SchemaAnalyzer {
           type: type.instance,
           default: options.default,
           required,
+          set: options.set,
           min: options.min
             ? Array.isArray(options.min)
               ? options.min[0]
@@ -136,6 +143,7 @@ export class SchemaAnalyzer {
           type: type.instance,
           default: options.default,
           required,
+          set: options.set,
           min: options.min
             ? Array.isArray(options.min)
               ? options.min[0]
@@ -153,6 +161,7 @@ export class SchemaAnalyzer {
           type: type.instance,
           default: options.default,
           required,
+          set: options.set,
           ref: options.ref
         };
       else
@@ -160,6 +169,7 @@ export class SchemaAnalyzer {
           path,
           type: type.instance,
           default: options.default,
+          set: options.set,
           required
         };
     });

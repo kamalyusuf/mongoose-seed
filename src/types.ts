@@ -26,6 +26,7 @@ interface AbstractConstraints<T> {
   path: string;
   default?: T | (() => T);
   required?: boolean | (() => boolean);
+  set?: (value: any) => any;
 }
 
 export interface StringConstraints extends AbstractConstraints<string> {
