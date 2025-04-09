@@ -84,7 +84,7 @@ export interface MapConstraints
   of: Instance | SchemaConstraints;
 }
 
-export interface EmbeddedConstraints extends AbstractConstraints<unknown> {
+export interface EmbeddedConstraints extends AbstractConstraints<AnyObject> {
   type: "Embedded";
   schema: SchemaConstraints;
 }
@@ -93,7 +93,7 @@ export interface UUIDConstraints extends AbstractConstraints<Types.UUID> {
   type: "UUID";
 }
 
-export interface BigIntConstraints extends AbstractConstraints<number> {
+export interface BigIntConstraints extends AbstractConstraints<bigint> {
   type: "BigInt";
 }
 
@@ -122,6 +122,7 @@ export type GeneratorFn<T> = (
             | Types.ObjectId
             | Buffer
             | Types.Decimal128
+            | typeof Schema.Types.UUID
             | BigInt
             | Types.Double
             | typeof Schema.Types.Int32

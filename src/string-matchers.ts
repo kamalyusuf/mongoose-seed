@@ -26,7 +26,6 @@ export const matchers: [RegExp, () => string][] = [
   [/\bgender\b/i, faker.person.sexType],
   [/\b(uuid|id|slug|token)\b/i, faker.string.uuid],
 
-  // product related
   [/\bproduct\b/i, faker.commerce.productName],
   [/\bsku\b/i, () => faker.string.alphanumeric(8).toUpperCase()],
   [/\bbarcode|ean|upc\b/i, () => faker.string.numeric(13)],
@@ -39,7 +38,6 @@ export const matchers: [RegExp, () => string][] = [
     () => `${faker.string.alpha(2).toUpperCase()}-${faker.string.numeric(4)}`
   ],
 
-  // location specific
   [/\blatitude\b/i, () => faker.location.latitude().toString()],
   [/\blongitude\b/i, () => faker.location.longitude().toString()],
   [
@@ -56,7 +54,6 @@ export const matchers: [RegExp, () => string][] = [
     () => faker.location.buildingNumber()
   ],
 
-  // communication & contact
   [/\bsubject\b/i, faker.lorem.sentence],
   [/\bmessage|content|body\b/i, faker.lorem.paragraphs],
   [/\bcomment\b/i, faker.lorem.paragraph],
@@ -64,7 +61,6 @@ export const matchers: [RegExp, () => string][] = [
   [/\bslogan\b/i, faker.company.catchPhrase],
   [/\bfax\b/i, faker.phone.number],
 
-  // financial
   [/\baccount_?number\b/i, () => faker.finance.accountNumber()],
   [/\broutin?g_?number\b/i, () => faker.finance.routingNumber()],
   [/\biban\b/i, faker.finance.iban],
@@ -77,7 +73,6 @@ export const matchers: [RegExp, () => string][] = [
   [/\btransaction\b/i, faker.finance.transactionType],
   [/\binvoice\b/i, () => `INV-${faker.string.alphanumeric(8).toUpperCase()}`],
 
-  // date & time
   [/\b(dob|birth(day|date))\b/i, () => faker.date.birthdate().toISOString()],
   [/\bappointment\b/i, () => faker.date.future().toISOString()],
   [/\bevent_?date\b/i, () => faker.date.future().toISOString().split("T")[0]!],
@@ -86,13 +81,11 @@ export const matchers: [RegExp, () => string][] = [
     () => faker.date.future().toISOString().split("T")[1]!.split(".")[0]!
   ],
 
-  // media & content
   [/\bthumbnail\b/i, faker.image.avatar],
-  [/\bvideo\b/i, () => `https://example.com/videos/${faker.string.uuid()}`],
-  [/\baudio\b/i, () => `https://example.com/audio/${faker.string.uuid()}`],
+  [/\bvideo\b/i, () => `https://example.com/videos/${faker.string.nanoid()}`],
+  [/\baudio\b/i, () => `https://example.com/audio/${faker.string.nanoid()}`],
   [/\btags?\b/i, () => faker.lorem.words(3).split(" ").join(",")],
 
-  // user account & security
   [/\bapi_?key\b/i, () => faker.string.alphanumeric(32)],
   [/\baccess_?token\b/i, () => `${faker.string.alphanumeric(64)}`],
   [/\brefresh_?token\b/i, () => `${faker.string.alphanumeric(64)}`],

@@ -1,15 +1,15 @@
 import { Schema, type AnyObject } from "mongoose";
 import type { ArrayConstraints, SchemaConstraints } from "./types.js";
 
-export interface AnalyzerOptions {
-  exclude?: string[];
+export interface AnalyzerOptions<T> {
+  exclude?: (keyof T)[];
 }
 
-export class SchemaAnalyzer {
+export class SchemaAnalyzer<T> {
   #exclude: string[] = ["_id", "__v"];
 
-  constructor({ exclude }: AnalyzerOptions = {}) {
-    if (exclude) this.#exclude = this.#exclude.concat(exclude);
+  constructor({ exclude }: AnalyzerOptions<T> = {}) {
+    if (exclude?.length) this.#exclude = this.#exclude.concat(exclude as any);
   }
 
   constraints(schema: Schema): SchemaConstraints {

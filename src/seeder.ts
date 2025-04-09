@@ -1,48 +1,39 @@
-import type { AnyObject, Model } from "mongoose";
+import type { InsertManyResult, Model } from "mongoose";
 import { SchemaAnalyzer, type AnalyzerOptions } from "./schema-analyzer.js";
 import { Generator, type GeneratorOptions } from "./generator.js";
-import { Limbo } from "../dev/model.js";
 import { faker } from "@faker-js/faker";
 
-interface SeedOptions<T> extends AnalyzerOptions, GeneratorOptions<T> {
+interface SeedOptions<T> extends AnalyzerOptions<T>, GeneratorOptions<T> {
   quantity: number | [min: number, max: number];
   clean?: boolean;
 }
 
-export const seed = async <T>(model: Model<T>, options: SeedOptions<T>) => {
+export const seed = async <T>(
+  model: Model<T>,
+  options: SeedOptions<T>
+): Promise<InsertManyResult<T>> => {
   if (options.clean) await model.deleteMany({});
 
   const analyzer = new SchemaAnalyzer({ exclude: options.exclude });
 
   const constraints = analyzer.constraints(model.schema);
 
-  const generator = new Generator<T>(model.schema, {
-    generators: options.generators,
-    timestamps: options.timestamps,
-    optional_field_probability: options.optional_field_probability
-  });
-
-  const documents: AnyObject[] = [];
-
   const quantity = Array.isArray(options.quantity)
     ? faker.number.int({ min: options.quantity[0], max: options.quantity[1] })
     : options.quantity;
 
-  for (let i = 1; i <= quantity; i++)
-    documents.push(generator.generate(constraints));
+  const documents = Array.from({ length: quantity }, () =>
+    new Generator<T>(model.schema, {
+      generators: options.generators,
+      timestamps: options.timestamps,
+      optional_field_probability: options.optional_field_probability
+    }).generate(constraints)
+  );
 
-  return documents;
+  const result = await model.insertMany(documents, {
+    rawResult: true,
+    ordered: false
+  });
+
+  return result as any;
 };
-
-console.dir(
-  await seed(Limbo, {
-    quantity: 1,
-    exclude: ["oid", "scheme", "buffer", "dec128"],
-    timestamps: true,
-    optional_field_probability: 1,
-    generators: {}
-  }),
-  {
-    depth: Infinity
-  }
-);

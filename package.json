@@ -14,17 +14,14 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit && tsup-node --config build.config.ts",
-    "prepublishOnly": "yarn run build",
-    "dev": "tsup",
-    "seed": "tsx src/seeder.ts"
+    "build": "tsc",
+    "prepublishOnly": "yarn run build"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.6.0",
     "@types/node": "^22.13.17",
     "mongoose": "^8.13.1",
     "prettier": "^3.5.3",
-    "tsup": "^8.4.0",
     "typescript": "^5.8.2"
   },
   "packageManager": "yarn@4.8.1"

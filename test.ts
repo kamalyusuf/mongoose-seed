@@ -1,11 +1,10 @@
+import { seed } from "./src/seeder.js";
 import mongoose from "mongoose";
 
 const schema = new mongoose.Schema(
   {
     str: {
-      type: String,
-      required: false,
-      minlength: 2
+      type: String
     },
     num: {
       type: Number,
@@ -23,19 +22,18 @@ const schema = new mongoose.Schema(
     bigint: mongoose.Schema.Types.BigInt,
     double: mongoose.Schema.Types.Double,
     int32: mongoose.Schema.Types.Int32,
-    point: {
-      x: Number,
-      y: Number
-    },
-    scheme: new mongoose.Schema({
-      num: Number,
-      email: {
-        type: String
+    schema: new mongoose.Schema(
+      {
+        num: Number,
+        email: {
+          type: String
+        },
+        username: {
+          type: String
+        }
       },
-      username: {
-        type: String
-      }
-    }),
+      { _id: false }
+    ),
     array: [
       new mongoose.Schema({
         node: {
@@ -63,6 +61,7 @@ const schema = new mongoose.Schema(
     mixed: mongoose.Schema.Types.Mixed
   },
   {
+    versionKey: false,
     timestamps: {
       createdAt: "created_at",
       updatedAt: "updated_at"
@@ -70,4 +69,20 @@ const schema = new mongoose.Schema(
   }
 );
 
-export const Limbo = mongoose.model("Limbo", schema);
+const Stuff = mongoose.model("Stuff", schema);
+
+await mongoose.connect("mongodb://localhost:27017/mongoose-seeder");
+
+await Stuff.deleteMany({});
+
+const result = await seed(Stuff, {
+  quantity: 200,
+  exclude: [],
+  timestamps: true,
+  optional_field_probability: 1,
+  generators: {}
+});
+
+console.log(result);
+
+await mongoose.disconnect();

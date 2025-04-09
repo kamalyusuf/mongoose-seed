@@ -54,16 +54,23 @@ export class Generator<T> {
   }
 
   generate(constraints: SchemaConstraints): AnyObject {
-    for (const [path, constraint] of Object.entries(constraints)) {
-      const value = this.#value(constraint);
+    for (const [path, constraint] of Object.entries(constraints))
+      if (!this.#has_field_dependencies(constraint))
+        this.#doc[path] = this.#resolve_value(constraint);
 
-      if (constraint.set) this.#doc[path] = constraint.set(value);
-      else this.#doc[path] = value;
-    }
+    for (const [path, constraint] of Object.entries(constraints))
+      if (this.#has_field_dependencies(constraint))
+        this.#doc[path] = this.#resolve_value(constraint);
 
     if (Object.keys(this.#labels).length > 0) this.#resolve_timestamps();
 
     return this.#doc;
+  }
+
+  #resolve_value(constraints: FieldConstraints) {
+    const value = this.#value(constraints);
+
+    return constraints.set ? constraints.set(value) : value;
   }
 
   #value(constraints: FieldConstraints) {
@@ -120,11 +127,7 @@ export class Generator<T> {
 
     const path = constraints.path.toLowerCase();
 
-    if (
-      path.toLowerCase().includes("password") ||
-      path.toLowerCase().includes("hash")
-    )
-      return this.#hash(constraints);
+    if (/(password|hash)/i.test(path)) return this.#hash(constraints);
 
     const min = constraints.minlength ?? 1;
     const max = constraints.maxlength ?? 255;
@@ -221,22 +224,18 @@ export class Generator<T> {
   #array(constraints: ArrayConstraints): any[] {
     const length = faker.number.int({ min: 1, max: 10 });
 
-    if (typeof constraints.of !== "string" && constraints.of.type === "Array")
-      return Array.from({ length }, () =>
-        this.#array(constraints.of as ArrayConstraints)
-      );
+    return Array.from({ length }, () => {
+      if (typeof constraints.of !== "string" && constraints.of.type === "Array")
+        return this.#array(constraints.of as ArrayConstraints);
 
-    if (typeof constraints.of === "string")
-      return Array.from({ length }, () =>
-        this.#value({
+      if (typeof constraints.of === "string")
+        return this.#value({
           path: constraints.path,
           type: constraints.of as any,
           required: constraints.required,
           default: constraints.default
-        })
-      );
+        });
 
-    return Array.from({ length }, () => {
       const doc: AnyObject = {};
 
       for (const [field, constraint] of Object.entries(
@@ -417,5 +416,12 @@ export class Generator<T> {
     while (text.length < length) text += faker.lorem.paragraph() + " ";
 
     return text.length > max ? text.substring(0, max) : text;
+  }
+
+  #has_field_dependencies(constraint: FieldConstraints): boolean {
+    return (
+      typeof constraint.default === "function" ||
+      typeof constraint.required === "function"
+    );
   }
 }
