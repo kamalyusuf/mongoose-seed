@@ -1,4 +1,4 @@
-import { Types, type AnyObject } from "mongoose";
+import { Types, type AnyObject, type Schema } from "mongoose";
 import type {
   ArrayConstraints,
   BigIntConstraints,
@@ -9,6 +9,7 @@ import type {
   DoubleConstraints,
   EmbeddedConstraints,
   FieldConstraints,
+  GeneratorFn,
   Instance,
   Int32Constraints,
   MapConstraints,
@@ -19,93 +20,121 @@ import type {
   StringConstraints,
   UUIDConstraints
 } from "./types.js";
-import { faker } from "@faker-js/faker";
-import { randomUUID } from "node:crypto";
+import { faker, type Faker } from "@faker-js/faker";
+import { createHash, randomUUID } from "node:crypto";
+import { matchers } from "./string-matchers.js";
 
-// todo: refs
+export interface GeneratorOptions<T> {
+  timestamps?: boolean;
+  optional_field_probability?: number;
+  generators?: {
+    [K in keyof T]?: GeneratorFn<T[K]>;
+  } & { timestamps?: (faker: Faker) => Record<string, Date> };
+}
 
-class Generator {
-  generate(constraints: FieldConstraints) {
+export class Generator<T> {
+  #schema: Schema;
+
+  #doc: AnyObject;
+
+  #labels: {
+    created?: string;
+    updated?: string;
+  };
+
+  #timestamp?: Date;
+
+  #options?: GeneratorOptions<T>;
+
+  constructor(schema: Schema, options?: GeneratorOptions<T>) {
+    this.#schema = schema;
+    this.#doc = {};
+    this.#labels = this.#extract_timestamp_labels();
+    this.#options = options;
+  }
+
+  generate(constraints: SchemaConstraints): AnyObject {
+    for (const [path, constraint] of Object.entries(constraints))
+      this.#doc[path] = this.#value(constraint);
+
+    if (Object.keys(this.#labels).length > 0) this.#resolve_timestamps();
+
+    return this.#doc;
+  }
+
+  #value(constraints: FieldConstraints) {
     if (constraints.default !== undefined)
       return this.#default_value(constraints);
 
     if (!this.#should_generate(constraints)) return undefined;
 
+    if (this.#is_timestamp_field(constraints.path)) return undefined;
+
+    if ((this.#options?.generators as AnyObject)?.[constraints.path])
+      return (this.#options?.generators as AnyObject)[constraints.path]?.(
+        faker
+      );
+
     switch (constraints.type) {
       case "String":
-        return this.string(constraints);
+        return this.#string(constraints);
       case "Number":
-        return this.number(constraints);
+        return this.#number(constraints);
       case "Boolean":
-        return this.boolean(constraints);
+        return this.#boolean(constraints);
       case "Date":
-        return this.date(constraints);
+        return this.#date(constraints);
       case "Buffer":
-        return this.buffer(constraints);
+        return this.#buffer(constraints);
       case "Decimal128":
-        return this.decimal128(constraints);
+        return this.#decimal128(constraints);
       case "Double":
-        return this.double(constraints);
+        return this.#double(constraints);
       case "Int32":
-        return this.int32(constraints);
+        return this.#int32(constraints);
       case "BigInt":
-        return this.bigint(constraints);
+        return this.#bigint(constraints);
       case "ObjectId":
-        return this.objectid(constraints);
+        return this.#objectid(constraints);
       case "UUID":
-        return this.uuid(constraints);
+        return this.#uuid(constraints);
       case "Embedded":
-        return this.embedded(constraints);
+        return this.#embedded(constraints);
       case "Array":
-        return this.array(constraints);
+        return this.#array(constraints);
       case "Map":
-        return this.map(constraints);
+        return this.#map(constraints);
       case "Mixed":
-        return this.mixed(constraints);
+        return this.#mixed(constraints);
     }
   }
 
-  #should_generate(constraints: FieldConstraints): boolean {
-    if (typeof constraints.required === "function")
-      return constraints.required.call(undefined);
-
-    if (constraints.required === undefined || !constraints.required)
-      return faker.datatype.boolean({ probability: 0.7 });
-
-    return constraints.required;
-  }
-
-  #default_value(constraints: FieldConstraints) {
-    if (typeof constraints.default === "function")
-      return constraints.default.call(undefined);
-
-    return constraints.default;
-  }
-
-  string(constraints: StringConstraints): string {
+  #string(constraints: StringConstraints): string {
     if (constraints.enum) return faker.helpers.arrayElement(constraints.enum);
+
+    if (constraints.match) return faker.helpers.fromRegExp(constraints.match);
+
+    const path = constraints.path.toLowerCase();
+
+    if (
+      path.toLowerCase().includes("password") ||
+      path.toLowerCase().includes("hash")
+    )
+      return this.#hash(constraints);
 
     const min = constraints.minlength ?? 1;
     const max = constraints.maxlength ?? 255;
-    const length = faker.number.int({ min, max });
 
-    let value: string;
+    let value: string | undefined;
 
-    if (constraints.match) value = faker.helpers.fromRegExp(constraints.match);
-    else if (constraints.ref) value = new Types.ObjectId().toString();
-    else {
-      const path = constraints.path.toLowerCase();
-
-      if (path.includes("name")) value = faker.person.fullName();
-      else if (path.includes("email")) value = faker.internet.email();
-      else if (path.includes("username")) value = faker.internet.username();
-      else if (path.includes("password"))
-        value = faker.internet.password({ length });
-      else if (path.includes("address")) value = faker.location.streetAddress();
-      else if (path.includes("phone")) value = faker.phone.number();
-      else if (path.includes("url")) value = faker.internet.url();
-      else value = faker.lorem.paragraph().substring(0, length);
+    for (const [regex, generator] of matchers) {
+      if (regex.test(path)) {
+        value = generator();
+        break;
+      }
     }
+
+    if (!value) value = this.#lorem(min, max);
 
     if (constraints.trim) value = value.trim();
 
@@ -115,11 +144,18 @@ class Generator {
     return value;
   }
 
-  boolean(_constraints: BooleanConstraints): boolean {
-    return faker.datatype.boolean();
+  #hash(constraints: StringConstraints): string {
+    const min = constraints.minlength ?? 8;
+    const max = constraints.maxlength ?? 128;
+
+    const length = faker.number.int({ min, max });
+
+    const password = faker.internet.password({ length });
+
+    return createHash("sha256").update(password).digest("hex");
   }
 
-  number(constraints: NumberConstraints): number {
+  #number(constraints: NumberConstraints): number {
     if (constraints.enum) return faker.helpers.arrayElement(constraints.enum);
 
     const min = constraints.min ?? Number.MIN_SAFE_INTEGER;
@@ -128,92 +164,72 @@ class Generator {
     return faker.number.int({ min, max });
   }
 
-  double(constraints: DoubleConstraints): number {
-    const min = constraints.min ?? 1;
-    const max = constraints.max ?? 1_000_000;
-
-    return faker.number.float({ min, max, fractionDigits: 2 });
+  #boolean(_constraints: BooleanConstraints): boolean {
+    return faker.datatype.boolean();
   }
 
-  bigint(constraints: BigIntConstraints): bigint {
-    const min = constraints.min
-      ? BigInt(constraints.min)
-      : BigInt(Number.MIN_SAFE_INTEGER);
-
-    const max = constraints.max
-      ? BigInt(constraints.max)
-      : BigInt(Number.MAX_SAFE_INTEGER);
-
-    return BigInt(faker.number.int({ min: Number(min), max: Number(max) }));
+  #double(_constraints: DoubleConstraints): number {
+    return faker.number.float({ min: 1, max: 1_000_000, fractionDigits: 2 });
   }
 
-  date(constraints: DateConstraints): Date {
+  #bigint(_constraints: BigIntConstraints): bigint {
+    return BigInt(faker.number.int({ min: -1_000_000, max: 1_000_000 }));
+  }
+
+  #date(constraints: DateConstraints): Date {
     const min = constraints.min ?? new Date(1970, 0, 1);
     const max = constraints.max ?? new Date();
 
     return faker.date.between({ from: min, to: max });
   }
 
-  buffer(_constraints: BufferConstraints): Buffer {
+  #buffer(_constraints: BufferConstraints): Buffer {
     return Buffer.from(faker.lorem.word());
   }
 
-  decimal128(constraints: Decimal128Constraints): Types.Decimal128 {
-    const min = constraints.min ?? Number.MIN_SAFE_INTEGER;
-    const max = constraints.max ?? Number.MAX_SAFE_INTEGER;
-
-    return new Types.Decimal128(faker.number.float({ min, max }).toString());
+  #decimal128(_constraints: Decimal128Constraints): Types.Decimal128 {
+    return new Types.Decimal128(
+      faker.number.float({ min: 1, max: 1_000_000 }).toString()
+    );
   }
 
-  int32(constraints: Int32Constraints) {
-    const min = constraints.min ?? -2147483648;
-    const max = constraints.max ?? 2147483647;
-
-    return faker.number.int({ min, max });
+  #int32(_constraints: Int32Constraints) {
+    return faker.number.int({ min: -1_000_000, max: 1_000_000 });
   }
 
-  objectid(_constraints: ObjectIdConstraints): Types.ObjectId {
-    // todo
-    // // If it's a reference field, we might want to generate a valid reference
-    // if (constraints.ref) {
-    //   // In a real implementation, you might want to:
-    //   // 1. Check if referenced model exists
-    //   // 2. Potentially create a document in that model
-    //   // 3. Return its _id
-    //   // For now, we'll just return a new ObjectId
-    //   return new Types.ObjectId();
-    // }
-
+  #objectid(_constraints: ObjectIdConstraints): Types.ObjectId {
     return new Types.ObjectId();
   }
 
-  uuid(_constraints: UUIDConstraints) {
+  #uuid(_constraints: UUIDConstraints) {
     return randomUUID();
   }
 
-  embedded(constraints: EmbeddedConstraints) {
+  #embedded(constraints: EmbeddedConstraints) {
     const result: AnyObject = {};
 
     for (const [field, constraint] of Object.entries(constraints.schema))
-      result[field] = this.generate(constraint);
+      result[field] = this.#value(constraint);
 
     return result;
   }
 
-  array(constraints: ArrayConstraints): any[] {
+  #array(constraints: ArrayConstraints): any[] {
     const length = faker.number.int({ min: 1, max: 10 });
 
     if (typeof constraints.of !== "string" && constraints.of.type === "Array")
       return Array.from({ length }, () =>
-        this.array(constraints.of as ArrayConstraints)
+        this.#array(constraints.of as ArrayConstraints)
       );
 
     if (typeof constraints.of === "string")
       return Array.from({ length }, () =>
-        this.#generate_primitive_value(
-          constraints.of as Instance,
-          constraints.path
-        )
+        this.#value({
+          path: constraints.path,
+          type: constraints.of as any,
+          required: constraints.required,
+          default: constraints.default
+        })
       );
 
     return Array.from({ length }, () => {
@@ -222,13 +238,13 @@ class Generator {
       for (const [field, constraint] of Object.entries(
         constraints.of as SchemaConstraints
       ))
-        doc[field] = this.generate(constraint);
+        doc[field] = this.#value(constraint);
 
       return doc;
     });
   }
 
-  map(constraints: MapConstraints): AnyObject {
+  #map(constraints: MapConstraints): AnyObject {
     const entries = faker.number.int({ min: 1, max: 5 });
 
     const obj: AnyObject = {};
@@ -237,15 +253,16 @@ class Generator {
       const key = faker.word.sample();
 
       if (typeof constraints.of === "string")
-        obj[key] = this.#generate_primitive_value(
-          constraints.of,
-          constraints.path
-        );
+        obj[key] = this.#value({
+          path: constraints.path,
+          type: constraints.of as any,
+          required: constraints.required
+        });
       else {
         const entry: AnyObject = {};
 
         for (const [field, constraint] of Object.entries(constraints.of))
-          entry[field] = this.generate(constraint);
+          entry[field] = this.#value(constraint);
 
         obj[key] = entry;
       }
@@ -254,8 +271,8 @@ class Generator {
     return obj;
   }
 
-  mixed(constraints: MixedConstraints, depth = 0): any {
-    const instances: Instance[] = [
+  #mixed(constraints: MixedConstraints, depth = 0): any {
+    const primitives: Instance[] = [
       "String",
       "Number",
       "Boolean",
@@ -270,88 +287,131 @@ class Generator {
     ];
 
     if (depth >= 3)
-      return this.#generate_primitive_value(
-        faker.helpers.arrayElement(instances),
-        constraints.path
-      );
+      return this.#value({
+        path: constraints.path,
+        type: faker.helpers.arrayElement(primitives) as any,
+        required: true
+      });
 
     const type = faker.helpers.arrayElement(["primitive", "array", "object"]);
 
     switch (type) {
       case "primitive":
-        return this.#generate_primitive_value(
-          faker.helpers.arrayElement(instances),
-          constraints.path
-        );
+        return this.#value({
+          path: constraints.path,
+          type: faker.helpers.arrayElement(primitives) as any,
+          required: true
+        });
 
       case "array":
-        const length = faker.number.int({ min: 1, max: 3 });
-        return Array.from({ length }, () => this.mixed(constraints, depth + 1));
+        return Array.from(
+          { length: faker.number.int({ min: 1, max: 3 }) },
+          () => this.#mixed(constraints, depth + 1)
+        );
 
       case "object":
         const entries = faker.number.int({ min: 1, max: 3 });
         const obj: AnyObject = {};
 
-        for (let i = 0; i < entries; i++) {
-          const key = faker.word.sample();
-          obj[key] = this.mixed(constraints, depth + 1);
-        }
+        for (let i = 0; i < entries; i++)
+          obj[faker.word.sample()] = this.#mixed(constraints, depth + 1);
 
         return obj;
     }
   }
 
-  #generate_primitive_value(instance: Instance, path: string) {
-    switch (instance) {
-      case "String":
-        return faker.lorem.sentence();
-      case "Number":
-        return faker.number.int({
-          min: Number.MIN_SAFE_INTEGER,
-          max: Number.MAX_SAFE_INTEGER
-        });
-      case "Boolean":
-        return faker.datatype.boolean();
-      case "Date":
-        return faker.date.between({
-          from: new Date(1970, 0, 1),
-          to: new Date()
-        });
-      case "Buffer":
-        return Buffer.from(faker.lorem.word());
-      case "Decimal128":
-        return new Types.Decimal128(
-          faker.number
-            .float({
-              min: Number.MIN_SAFE_INTEGER,
-              max: Number.MAX_SAFE_INTEGER
-            })
-            .toString()
-        );
-      case "Double":
-        return faker.number.float({
-          min: 1,
-          max: 1_000_000,
-          fractionDigits: 2
-        });
-      case "Int32":
-        return faker.number.int({ min: -2147483648, max: 2147483647 });
-      case "BigInt":
-        return BigInt(
-          faker.number.int({
-            min: Number(BigInt(Number.MIN_SAFE_INTEGER)),
-            max: Number(BigInt(Number.MAX_SAFE_INTEGER))
-          })
-        );
-      case "ObjectId":
-        return new Types.ObjectId();
-      case "UUID":
-        return randomUUID();
+  #should_generate(constraints: FieldConstraints): boolean {
+    if (this.#is_timestamp_field(constraints.path)) return true;
 
-      default:
-        throw new Error(`Unsupported primitive type: ${instance} for ${path}`);
+    if (typeof constraints.required === "function")
+      return this.#evaluate_with_context(constraints.required);
+
+    if (constraints.required === undefined || constraints.required === false)
+      return faker.datatype.boolean({
+        probability: this.#options?.optional_field_probability ?? 0.7
+      });
+
+    return constraints.required;
+  }
+
+  #default_value(constraints: FieldConstraints) {
+    if (typeof constraints.default === "function")
+      return this.#evaluate_with_context(constraints.default);
+
+    return constraints.default;
+  }
+
+  #evaluate_with_context(value: Function) {
+    return value.call(
+      new Proxy(this.#doc, {
+        get: (target, prop, receiver) => Reflect.get(target, prop, receiver)
+      })
+    );
+  }
+
+  #resolve_timestamps() {
+    if (this.#options?.generators?.timestamps) {
+      const fields = this.#options.generators.timestamps(faker);
+
+      if (this.#labels.created && fields[this.#labels.created])
+        this.#doc[this.#labels.created] = fields[this.#labels.created];
+
+      if (this.#labels.updated && fields[this.#labels.updated])
+        this.#doc[this.#labels.updated] = fields[this.#labels.updated];
+    } else if (this.#options?.timestamps) {
+      const timestamp = this.#document_timestamp();
+
+      if (this.#labels.created) this.#doc[this.#labels.created] = timestamp;
+
+      if (this.#labels.updated) this.#doc[this.#labels.updated] = timestamp;
     }
   }
-}
 
-export const generator = new Generator();
+  #extract_timestamp_labels(): { created?: string; updated?: string } {
+    const options = this.#schema.get("timestamps");
+
+    if (options === true)
+      return {
+        created: "createdAt",
+        updated: "updatedAt"
+      };
+
+    if (!options) return {};
+
+    const fields: { created?: string; updated?: string } = {};
+
+    if (typeof options.createdAt === "string")
+      fields.created = options.createdAt;
+    else if (options.createdAt === true) fields.created = "createdAt";
+
+    if (typeof options.updatedAt === "string")
+      fields.updated = options.updatedAt;
+    else if (options.updatedAt === true) fields.updated = "updatedAt";
+
+    return fields;
+  }
+
+  #document_timestamp(): Date {
+    if (!this.#timestamp)
+      this.#timestamp = faker.date.between({
+        from: new Date(1970, 0, 1),
+        to: new Date()
+      });
+
+    return this.#timestamp;
+  }
+
+  #is_timestamp_field(path: string): boolean {
+    return this.#labels.created === path || this.#labels.updated === path;
+  }
+
+  #lorem(min: number, max: number): string {
+    const length = faker.number.int({ min, max });
+
+    let text = "";
+
+    while (text.length < length) text += faker.lorem.paragraph() + " ";
+
+    return text.length > max ? text.substring(0, max) : text;
+  }
+}

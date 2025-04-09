@@ -1,14 +1,22 @@
 import { Schema, type AnyObject } from "mongoose";
 import type { ArrayConstraints, SchemaConstraints } from "./types.js";
 
-// todo: ref
+export interface AnalyzerOptions {
+  exclude?: string[];
+}
 
-class SchemaAnalyzer {
+export class SchemaAnalyzer {
+  #exclude: string[] = ["_id", "__v"];
+
+  constructor({ exclude }: AnalyzerOptions = {}) {
+    if (exclude) this.#exclude = this.#exclude.concat(exclude);
+  }
+
   constraints(schema: Schema): SchemaConstraints {
     const constraint: AnyObject = {};
 
     schema.eachPath((path, type) => {
-      if (["_id", "__v"].includes(path) || path.includes(".$*")) return;
+      if (this.#exclude.includes(path) || path.includes(".$*")) return;
 
       const options = type.options;
 
@@ -20,9 +28,8 @@ class SchemaAnalyzer {
         constraint[path] = {
           path,
           type: type.instance,
-          required,
           default: options.default,
-          ref: options.ref,
+          required,
           schema: this.constraints(type.schema)
         };
       else if (type.instance === "Array") {
@@ -71,22 +78,89 @@ class SchemaAnalyzer {
           default: options.default,
           of: oftype
         };
-      } else
+      } else if (type.instance === "String")
         constraint[path] = {
           path,
           type: type.instance,
-          required,
-          enum: options.enum,
-          min: options.min,
-          max: options.max,
-          minlength: options.minlength,
-          maxlength: options.maxlength,
-          match: options.match,
           default: options.default,
-          ref: options.ref,
+          required,
           trim: options.trim,
           lowercase: options.lowercase,
-          uppercase: options.uppercase
+          uppercase: options.uppercase,
+          enum: options.enum
+            ? Array.isArray(options.enum)
+              ? options.enum
+              : options.enum.values
+            : undefined,
+          match: options.match
+            ? Array.isArray(options.match)
+              ? options.match[0]
+              : options.match
+            : undefined,
+          minlength: options.minlength
+            ? Array.isArray(options.minlength)
+              ? options.minlength[0]
+              : options.minlength
+            : undefined,
+          maxlength: options.maxlength
+            ? Array.isArray(options.maxlength)
+              ? options.maxlength[0]
+              : options.maxlength
+            : undefined
+        };
+      else if (type.instance === "Number")
+        constraint[path] = {
+          path,
+          type: type.instance,
+          default: options.default,
+          required,
+          min: options.min
+            ? Array.isArray(options.min)
+              ? options.min[0]
+              : options.min
+            : undefined,
+          max: options.max
+            ? Array.isArray(options.max)
+              ? options.max[0]
+              : options.max
+            : undefined,
+          enum: options.enum
+            ? Array.isArray(options.enum)
+              ? options.enum
+              : options.enum.values
+            : undefined
+        };
+      else if (type.instance === "Date")
+        constraint[path] = {
+          path,
+          type: type.instance,
+          default: options.default,
+          required,
+          min: options.min
+            ? Array.isArray(options.min)
+              ? options.min[0]
+              : options.min
+            : undefined,
+          max: options.max
+            ? Array.isArray(options.max)
+              ? options.max[0]
+              : options.max
+            : undefined
+        };
+      else if (type.instance === "ObjectId")
+        constraint[path] = {
+          path,
+          type: type.instance,
+          default: options.default,
+          required,
+          ref: options.ref
+        };
+      else
+        constraint[path] = {
+          path,
+          type: type.instance,
+          default: options.default,
+          required
         };
     });
 
@@ -111,5 +185,3 @@ class SchemaAnalyzer {
     return constraint;
   }
 }
-
-export const analyzer = new SchemaAnalyzer();

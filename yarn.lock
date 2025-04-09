@@ -252,6 +252,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@kamalyb/mongoose-seed@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@kamalyb/mongoose-seed@workspace:."
+  dependencies:
+    "@faker-js/faker": "npm:^9.6.0"
+    "@types/node": "npm:^22.13.17"
+    mongoose: "npm:^8.13.1"
+    prettier: "npm:^3.5.3"
+    tsup: "npm:^8.4.0"
+    typescript: "npm:^5.8.2"
+  languageName: unknown
+  linkType: soft
+
 "@mongodb-js/saslprep@npm:^1.1.9":
   version: 1.2.1
   resolution: "@mongodb-js/saslprep@npm:1.2.1"
@@ -1464,19 +1477,6 @@ __metadata:
   checksum: 10c0/7e3c8b2e88a1841c9671094bbaeebd94448111dd90a81a1f606f3f67708a6ec57763b3b47f06da09fc6054193e0e6709e77325415dc8422b04497a8070fa02d4
   languageName: node
   linkType: hard
-
-"seed@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "seed@workspace:."
-  dependencies:
-    "@faker-js/faker": "npm:^9.6.0"
-    "@types/node": "npm:^22.13.17"
-    mongoose: "npm:^8.13.1"
-    prettier: "npm:^3.5.3"
-    tsup: "npm:^8.4.0"
-    typescript: "npm:^5.8.2"
-  languageName: unknown
-  linkType: soft
 
 "semver@npm:^7.3.5":
   version: 7.7.1

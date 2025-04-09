@@ -1,36 +1,34 @@
 import type { AnyObject, Model } from "mongoose";
-import { analyzer } from "./schema-analyzer.js";
-import type { SchemaConstraints } from "./types.js";
-import { generator } from "./generator.js";
-import { Limbo } from "../dev/model.js";
+import { SchemaAnalyzer, type AnalyzerOptions } from "./schema-analyzer.js";
+import { Generator, type GeneratorOptions } from "./generator.js";
+import { faker } from "@faker-js/faker";
 
-interface SeedOptions {
-  quantity: number;
+interface SeedOptions<T> extends AnalyzerOptions, GeneratorOptions<T> {
+  quantity: number | [min: number, max: number];
   clean?: boolean;
 }
 
-export const seed = async (model: Model<any>, options: SeedOptions) => {
-  const schema = model.schema;
-
+export const seed = async <T>(model: Model<T>, options: SeedOptions<T>) => {
   if (options.clean) await model.deleteMany({});
 
-  const constraints = analyzer.constraints(schema);
+  const analyzer = new SchemaAnalyzer({ exclude: options.exclude });
+
+  const constraints = analyzer.constraints(model.schema);
+
+  const generator = new Generator<T>(model.schema, {
+    generators: options.generators,
+    timestamps: options.timestamps,
+    optional_field_probability: options.optional_field_probability
+  });
 
   const documents: AnyObject[] = [];
 
-  for (let i = 1; i <= options.quantity; i++)
-    documents.push(generate_document(constraints));
+  const quantity = Array.isArray(options.quantity)
+    ? faker.number.int({ min: options.quantity[0], max: options.quantity[1] })
+    : options.quantity;
+
+  for (let i = 1; i <= quantity; i++)
+    documents.push(generator.generate(constraints));
 
   return documents;
 };
-
-function generate_document(constraints: SchemaConstraints) {
-  const doc: AnyObject = {};
-
-  for (const [path, constraint] of Object.entries(constraints))
-    doc[path] = generator.generate(constraint);
-
-  return doc;
-}
-
-console.dir(await seed(Limbo, { quantity: 1 }), { depth: Infinity });

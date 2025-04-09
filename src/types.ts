@@ -1,4 +1,5 @@
-import type { Types } from "mongoose";
+import type { Faker } from "@faker-js/faker";
+import type { AnyObject, Model, Schema, Types } from "mongoose";
 
 export type Instance = FieldConstraints["type"];
 
@@ -25,7 +26,6 @@ interface AbstractConstraints<T> {
   path: string;
   default?: T | (() => T);
   required?: boolean | (() => boolean);
-  ref?: string;
 }
 
 export interface StringConstraints extends AbstractConstraints<string> {
@@ -63,6 +63,7 @@ export interface BooleanConstraints extends AbstractConstraints<boolean> {
 export interface ObjectIdConstraints
   extends AbstractConstraints<Types.ObjectId> {
   type: "ObjectId";
+  ref?: string | Model<any> | (() => string | Model<any>);
 }
 
 export interface ArrayConstraints
@@ -74,8 +75,6 @@ export interface ArrayConstraints
 export interface Decimal128Constraints
   extends AbstractConstraints<Types.Decimal128> {
   type: "Decimal128";
-  min?: number;
-  max?: number;
 }
 
 export interface MapConstraints
@@ -95,22 +94,45 @@ export interface UUIDConstraints extends AbstractConstraints<Types.UUID> {
 
 export interface BigIntConstraints extends AbstractConstraints<number> {
   type: "BigInt";
-  min?: number;
-  max?: number;
 }
 
 export interface DoubleConstraints extends AbstractConstraints<Types.Double> {
   type: "Double";
-  min?: number;
-  max?: number;
 }
 
 export interface Int32Constraints extends AbstractConstraints<number> {
   type: "Int32";
-  min?: number;
-  max?: number;
 }
 
 export interface MixedConstraints extends AbstractConstraints<any> {
   type: "Mixed";
 }
+
+export type GeneratorFn<T> = (
+  faker: Faker
+) => T extends Types.DocumentArray<infer U>
+  ? U[]
+  : T extends Map<infer K, infer V>
+    ? Record<K extends PropertyKey ? K : never, V>
+    : T extends typeof Schema.Types.Mixed
+      ? any
+      : T extends
+            | Date
+            | Types.ObjectId
+            | Buffer
+            | Types.Decimal128
+            | BigInt
+            | Types.Double
+            | typeof Schema.Types.Int32
+        ? T
+        : T extends AnyObject
+          ? ExtractObjectWithoutIndexSignature<T>
+          : T;
+
+type ExtractObjectWithoutIndexSignature<T> = T extends any
+  ? [keyof T] extends [never]
+    ? never
+    : string extends keyof T
+      ? never
+      : T
+  : never;
