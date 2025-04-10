@@ -73,16 +73,22 @@ const Stuff = mongoose.model("Stuff", schema);
 
 await mongoose.connect("mongodb://localhost:27017/mongoose-seeder");
 
-await Stuff.deleteMany({});
+try {
+  const result = await seed(Stuff, {
+    quantity: 5000,
+    clean: true,
+    exclude: [],
+    debug: true,
+    timestamps: true,
+    optional_field_probability: 1,
+    generators: {}
+  });
 
-const result = await seed(Stuff, {
-  quantity: 200,
-  exclude: [],
-  timestamps: true,
-  optional_field_probability: 1,
-  generators: {}
-});
+  // console.log(result);
+} catch (e) {
+  const error = e as Error;
 
-console.log(result);
-
-await mongoose.disconnect();
+  console.error({ error: error.message });
+} finally {
+  await mongoose.disconnect();
+}

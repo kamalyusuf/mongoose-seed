@@ -18,11 +18,13 @@
     "prepublishOnly": "yarn run build"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.6.0",
     "@types/node": "^22.13.17",
     "mongoose": "^8.13.1",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2"
   },
-  "packageManager": "yarn@4.8.1"
+  "packageManager": "yarn@4.8.1",
+  "dependencies": {
+    "@faker-js/faker": "^9.6.0"
+  }
 }
