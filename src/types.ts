@@ -109,27 +109,28 @@ export interface MixedConstraints extends AbstractConstraints<any> {
   type: "Mixed";
 }
 
-export type GeneratorFn<T> = (
-  faker: Faker
-) => T extends Types.DocumentArray<infer U>
-  ? U[]
-  : T extends Map<infer K, infer V>
-    ? Record<K extends PropertyKey ? K : never, V>
-    : T extends typeof Schema.Types.Mixed
-      ? any
-      : T extends
-            | Date
-            | Types.ObjectId
-            | Buffer
-            | Types.Decimal128
-            | typeof Schema.Types.UUID
-            | BigInt
-            | Types.Double
-            | typeof Schema.Types.Int32
-        ? T
-        : T extends AnyObject
-          ? ExtractObjectWithoutIndexSignature<T>
-          : T;
+export type LeanValue<T> =
+  T extends Types.DocumentArray<infer U>
+    ? U[]
+    : T extends Map<infer K, infer V>
+      ? Record<K extends PropertyKey ? K : never, V>
+      : T extends typeof Schema.Types.Mixed
+        ? any
+        : T extends
+              | Date
+              | Types.ObjectId
+              | Buffer
+              | Types.Decimal128
+              | typeof Schema.Types.UUID
+              | BigInt
+              | Types.Double
+              | typeof Schema.Types.Int32
+          ? T
+          : T extends AnyObject
+            ? ExtractObjectWithoutIndexSignature<T>
+            : T;
+
+export type GeneratorFn<T> = (faker: Faker) => LeanValue<T>;
 
 type ExtractObjectWithoutIndexSignature<T> = T extends any
   ? [keyof T] extends [never]

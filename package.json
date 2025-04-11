@@ -12,6 +12,20 @@
   "files": [
     "dist"
   ],
+  "keywords": [
+    "mongoose",
+    "faker",
+    "seeder",
+    "seed",
+    "mongodb",
+    "fakerjs",
+    "mongodb seeder",
+    "mongoose seed",
+    "data generator",
+    "testing",
+    "mock data",
+    "fake data"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
@@ -19,12 +33,12 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.17",
-    "mongoose": "^8.13.1",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2"
   },
   "packageManager": "yarn@4.8.1",
   "dependencies": {
-    "@faker-js/faker": "^9.6.0"
+    "@faker-js/faker": "^9.6.0",
+    "mongoose": "^8.13.2"
   }
 }

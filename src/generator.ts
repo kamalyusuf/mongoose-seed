@@ -12,6 +12,7 @@ import type {
   GeneratorFn,
   Instance,
   Int32Constraints,
+  LeanValue,
   MapConstraints,
   MixedConstraints,
   NumberConstraints,
@@ -29,7 +30,12 @@ export interface GeneratorOptions<T> {
   optional_field_probability?: number;
   generators?: {
     [K in keyof T]?: GeneratorFn<T[K]>;
-  } & { timestamps?: (faker: Faker) => Record<string, Date> };
+  } & {
+    timestamps?: (
+      faker: Faker,
+      doc: Partial<{ [Key in keyof T]: LeanValue<T[Key]> }>
+    ) => Record<string, Date>;
+  };
 }
 
 export class Generator<T> {
@@ -344,17 +350,22 @@ export class Generator<T> {
     return constraints.default;
   }
 
+  #proxify_doc() {
+    return new Proxy(this.#doc, {
+      get: (target, prop, receiver) => Reflect.get(target, prop, receiver)
+    });
+  }
+
   #evaluate_with_context(value: Function) {
-    return value.call(
-      new Proxy(this.#doc, {
-        get: (target, prop, receiver) => Reflect.get(target, prop, receiver)
-      })
-    );
+    return value.call(this.#proxify_doc());
   }
 
   #resolve_timestamps() {
     if (this.#options?.generators?.timestamps) {
-      const fields = this.#options.generators.timestamps(faker);
+      const fields = this.#options.generators.timestamps(
+        faker,
+        this.#proxify_doc() as any
+      );
 
       if (this.#labels.created && fields[this.#labels.created])
         this.#doc[this.#labels.created] = fields[this.#labels.created];

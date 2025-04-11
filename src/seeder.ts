@@ -11,7 +11,7 @@ import {
   memory_usage
 } from "./utils.js";
 
-interface SeedOptions<T> extends AnalyzerOptions<T>, GeneratorOptions<T> {
+export interface SeedConfig<T> extends AnalyzerOptions<T>, GeneratorOptions<T> {
   quantity: number | [min: number, max: number];
   clean?: boolean;
   debug?: boolean;
@@ -19,7 +19,7 @@ interface SeedOptions<T> extends AnalyzerOptions<T>, GeneratorOptions<T> {
 
 export const seed = async <T>(
   model: Model<T>,
-  options: SeedOptions<T>
+  options: SeedConfig<T>
 ): Promise<InsertManyResult<T>> => {
   const debug = options.debug ?? true;
   let peak_memory = 0;
@@ -42,7 +42,7 @@ export const seed = async <T>(
       update_peak_memory();
 
       success(
-        `[${model.modelName}] Cleaned ${result.deletedCount} documents in ${elapsed}ms`
+        `[${model.modelName}] Cleaned ${result.deletedCount.toLocaleString()} documents in ${elapsed}ms`
       );
 
       warning(
@@ -87,7 +87,7 @@ export const seed = async <T>(
         }
 
         info(
-          `[${model.modelName}] Progress: ${index + 1}/${quantity} documents generated (${progress}%)`
+          `[${model.modelName}] Progress: ${(index + 1).toLocaleString()}/${quantity.toLocaleString()} documents generated (${progress}%)`
         );
       }
 
@@ -97,14 +97,16 @@ export const seed = async <T>(
 
   if (debug) {
     success(
-      `[${model.modelName}] Generated ${quantity} documents in ${documents.elapsed}ms`
+      `[${model.modelName}] Generated ${quantity.toLocaleString()} documents in ${documents.elapsed}ms`
     );
 
     warning(
       `[${model.modelName}] Peak memory during generation: ${format_memory(peak_memory)}`
     );
 
-    info(`[${model.modelName}] Inserting ${quantity} documents`);
+    info(
+      `[${model.modelName}] Inserting ${quantity.toLocaleString()} documents`
+    );
   }
 
   const result = await measure.async(
@@ -120,7 +122,7 @@ export const seed = async <T>(
     const final_memory = memory_usage();
 
     success(
-      `[${model.modelName}] Seeded ${quantity} documents in ${result.elapsed}ms`
+      `[${model.modelName}] Seeded ${quantity.toLocaleString()} documents in ${result.elapsed}ms`
     );
 
     warning(`[${model.modelName}] Final memory usage:
