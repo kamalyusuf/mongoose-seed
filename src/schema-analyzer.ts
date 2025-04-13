@@ -63,7 +63,11 @@ export class SchemaAnalyzer<T> {
             type: type.instance,
             required,
             set: options.set,
-            of: caster.instance
+            of: caster.instance,
+            ref:
+              caster.instance === "ObjectId" && caster.options.ref
+                ? caster.options.ref
+                : undefined
           };
         }
       } else if (type.instance === "Map") {

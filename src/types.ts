@@ -71,6 +71,7 @@ export interface ArrayConstraints
   extends AbstractConstraints<Types.Array<unknown>> {
   type: "Array";
   of: Instance | SchemaConstraints | ArrayConstraints;
+  ref?: string | Model<any> | (() => string | Model<any>);
 }
 
 export interface Decimal128Constraints

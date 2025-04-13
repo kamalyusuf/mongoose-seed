@@ -1,4 +1,4 @@
-import { Types, type AnyObject, type Schema } from "mongoose";
+import { Types, type AnyObject, type Model, type Schema } from "mongoose";
 import type {
   ArrayConstraints,
   BigIntConstraints,
@@ -24,6 +24,7 @@ import type {
 import { faker, type Faker } from "@faker-js/faker";
 import { createHash, randomUUID } from "node:crypto";
 import { matchers } from "./string-matchers.js";
+import { registry } from "./registry.js";
 
 export interface GeneratorOptions<T> {
   timestamps?: boolean;
@@ -52,34 +53,37 @@ export class Generator<T> {
 
   #options?: GeneratorOptions<T>;
 
-  constructor(schema: Schema, options?: GeneratorOptions<T>) {
-    this.#schema = schema;
+  #model: Model<any>;
+
+  constructor(model: Model<any>, options?: GeneratorOptions<T>) {
+    this.#model = model;
+    this.#schema = model.schema;
     this.#doc = {};
     this.#labels = this.#extract_timestamp_labels();
     this.#options = options;
   }
 
-  generate(constraints: SchemaConstraints): AnyObject {
+  async generate(constraints: SchemaConstraints): Promise<AnyObject> {
     for (const [path, constraint] of Object.entries(constraints))
       if (!this.#has_field_dependencies(constraint))
-        this.#doc[path] = this.#resolve_value(constraint);
+        this.#doc[path] = await this.#resolve_value(constraint);
 
     for (const [path, constraint] of Object.entries(constraints))
       if (this.#has_field_dependencies(constraint))
-        this.#doc[path] = this.#resolve_value(constraint);
+        this.#doc[path] = await this.#resolve_value(constraint);
 
     if (Object.keys(this.#labels).length > 0) this.#resolve_timestamps();
 
     return this.#doc;
   }
 
-  #resolve_value(constraints: FieldConstraints) {
-    const value = this.#value(constraints);
+  async #resolve_value(constraints: FieldConstraints) {
+    const value = await this.#value(constraints);
 
     return constraints.set ? constraints.set(value) : value;
   }
 
-  #value(constraints: FieldConstraints) {
+  async #value(constraints: FieldConstraints) {
     if (constraints.default !== undefined)
       return this.#default_value(constraints);
 
@@ -210,50 +214,68 @@ export class Generator<T> {
     return faker.number.int({ min: -1_000_000, max: 1_000_000 });
   }
 
-  #objectid(_constraints: ObjectIdConstraints): Types.ObjectId {
-    return new Types.ObjectId();
+  async #objectid(constraints: ObjectIdConstraints) {
+    if (!constraints.ref) return new Types.ObjectId();
+
+    const ref = this.#resolve_ref_model(constraints.ref);
+
+    return await registry.single(this.#model, ref);
   }
 
   #uuid(_constraints: UUIDConstraints) {
     return randomUUID();
   }
 
-  #embedded(constraints: EmbeddedConstraints) {
+  async #embedded(constraints: EmbeddedConstraints) {
     const result: AnyObject = {};
 
     for (const [field, constraint] of Object.entries(constraints.schema))
-      result[field] = this.#value(constraint);
+      result[field] = await this.#value(constraint);
 
     return result;
   }
 
-  #array(constraints: ArrayConstraints): any[] {
+  async #array(constraints: ArrayConstraints): Promise<any[]> {
     const length = faker.number.int({ min: 1, max: 10 });
 
-    return Array.from({ length }, () => {
+    if (constraints.ref)
+      return await registry.multiple(
+        this.#model,
+        this.#resolve_ref_model(constraints.ref),
+        length
+      );
+
+    const items: any[] = [];
+
+    for (let i = 0; i < length; i++) {
       if (typeof constraints.of !== "string" && constraints.of.type === "Array")
-        return this.#array(constraints.of as ArrayConstraints);
+        items.push(await this.#array(constraints.of as ArrayConstraints));
+      else if (typeof constraints.of === "string")
+        items.push(
+          await this.#value({
+            path: constraints.path,
+            type: constraints.of as any,
+            required: constraints.required,
+            default: constraints.default,
+            ref: constraints.of === "ObjectId" ? constraints.ref : undefined
+          })
+        );
+      else {
+        const doc: AnyObject = {};
 
-      if (typeof constraints.of === "string")
-        return this.#value({
-          path: constraints.path,
-          type: constraints.of as any,
-          required: constraints.required,
-          default: constraints.default
-        });
+        for (const [field, constraint] of Object.entries(
+          constraints.of as SchemaConstraints
+        ))
+          doc[field] = await this.#value(constraint);
 
-      const doc: AnyObject = {};
+        items.push(doc);
+      }
+    }
 
-      for (const [field, constraint] of Object.entries(
-        constraints.of as SchemaConstraints
-      ))
-        doc[field] = this.#value(constraint);
-
-      return doc;
-    });
+    return items;
   }
 
-  #map(constraints: MapConstraints): AnyObject {
+  async #map(constraints: MapConstraints) {
     const entries = faker.number.int({ min: 1, max: 5 });
 
     const obj: AnyObject = {};
@@ -262,7 +284,7 @@ export class Generator<T> {
       const key = faker.word.sample();
 
       if (typeof constraints.of === "string")
-        obj[key] = this.#value({
+        obj[key] = await this.#value({
           path: constraints.path,
           type: constraints.of as any,
           required: constraints.required
@@ -271,7 +293,7 @@ export class Generator<T> {
         const entry: AnyObject = {};
 
         for (const [field, constraint] of Object.entries(constraints.of))
-          entry[field] = this.#value(constraint);
+          entry[field] = await this.#value(constraint);
 
         obj[key] = entry;
       }
@@ -280,7 +302,7 @@ export class Generator<T> {
     return obj;
   }
 
-  #mixed(constraints: MixedConstraints, depth = 0): any {
+  async #mixed(constraints: MixedConstraints, depth = 0): Promise<any> {
     const primitives: Instance[] = [
       "String",
       "Number",
@@ -296,7 +318,7 @@ export class Generator<T> {
     ];
 
     if (depth >= 3)
-      return this.#value({
+      return await this.#value({
         path: constraints.path,
         type: faker.helpers.arrayElement(primitives) as any,
         required: true
@@ -306,24 +328,28 @@ export class Generator<T> {
 
     switch (type) {
       case "primitive":
-        return this.#value({
+        return await this.#value({
           path: constraints.path,
           type: faker.helpers.arrayElement(primitives) as any,
           required: true
         });
 
       case "array":
-        return Array.from(
-          { length: faker.number.int({ min: 1, max: 3 }) },
-          () => this.#mixed(constraints, depth + 1)
-        );
+        const length = faker.number.int({ min: 1, max: 3 });
+
+        const items: any[] = [];
+
+        for (let i = 0; i < length; i++)
+          items.push(await this.#mixed(constraints, depth + 1));
+
+        return items;
 
       case "object":
         const entries = faker.number.int({ min: 1, max: 3 });
         const obj: AnyObject = {};
 
         for (let i = 0; i < entries; i++)
-          obj[faker.word.sample()] = this.#mixed(constraints, depth + 1);
+          obj[faker.word.sample()] = await this.#mixed(constraints, depth + 1);
 
         return obj;
     }
@@ -434,5 +460,14 @@ export class Generator<T> {
       typeof constraint.default === "function" ||
       typeof constraint.required === "function"
     );
+  }
+
+  #resolve_ref_model(ref: NonNullable<ObjectIdConstraints["ref"]>): string {
+    if (typeof ref === "function" && !("modelName" in ref))
+      return this.#resolve_ref_model(ref.call(undefined));
+
+    if (typeof ref === "string") return ref;
+
+    return ref.modelName;
   }
 }

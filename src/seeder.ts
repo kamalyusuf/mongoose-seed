@@ -1,4 +1,4 @@
-import type { InsertManyResult, Model } from "mongoose";
+import type { AnyObject, InsertManyResult, Model } from "mongoose";
 import { SchemaAnalyzer, type AnalyzerOptions } from "./schema-analyzer.js";
 import { Generator, type GeneratorOptions } from "./generator.js";
 import { faker } from "@faker-js/faker";
@@ -10,6 +10,7 @@ import {
   warning,
   memory_usage
 } from "./utils.js";
+import { registry } from "./registry.js";
 
 export interface SeedConfig<T> extends AnalyzerOptions<T>, GeneratorOptions<T> {
   quantity: number | [min: number, max: number];
@@ -62,13 +63,17 @@ export const seed = async <T>(
   const interval = Math.max(1, Math.floor(quantity / 10));
   let last_memory_log = 0;
 
-  const documents = measure(() =>
-    Array.from({ length: quantity }, (_, index) => {
-      const doc = new Generator<T>(model.schema, {
-        generators: options.generators,
-        timestamps: options.timestamps,
-        optional_field_probability: options.optional_field_probability
-      }).generate(constraints);
+  const documents = await measure.async(async () => {
+    const docs: AnyObject[] = [];
+
+    for (let index = 0; index < quantity; index++) {
+      docs.push(
+        await new Generator<T>(model, {
+          generators: options.generators,
+          timestamps: options.timestamps,
+          optional_field_probability: options.optional_field_probability
+        }).generate(constraints)
+      );
 
       if (debug) update_peak_memory();
 
@@ -90,10 +95,10 @@ export const seed = async <T>(
           `[${model.modelName}] Progress: ${(index + 1).toLocaleString()}/${quantity.toLocaleString()} documents generated (${progress}%)`
         );
       }
+    }
 
-      return doc;
-    })
-  );
+    return docs;
+  });
 
   if (debug) {
     success(
@@ -122,7 +127,7 @@ export const seed = async <T>(
     const final_memory = memory_usage();
 
     success(
-      `[${model.modelName}] Seeded ${quantity.toLocaleString()} documents in ${result.elapsed}ms`
+      `[${model.modelName}] Seeded ${result.result.insertedCount.toLocaleString()} documents in ${result.elapsed}ms`
     );
 
     warning(`[${model.modelName}] Final memory usage:
@@ -134,6 +139,8 @@ export const seed = async <T>(
   const end = performance.now();
 
   info(`[${model.modelName}] Total time elapsed ${end - start}ms`);
+
+  registry.register(model.modelName, Object.values(result.result.insertedIds));
 
   return result.result as any;
 };

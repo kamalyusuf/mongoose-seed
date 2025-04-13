@@ -75,7 +75,7 @@ await mongoose.connect("mongodb://localhost:27017/mongoose-seeder");
 
 try {
   const result = await seed(Stuff, {
-    quantity: 2500,
+    quantity: 5000,
     clean: true,
     exclude: [],
     debug: true,

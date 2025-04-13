@@ -8,10 +8,10 @@ export const measure = <T>(fn: () => T): { result: T; elapsed: number } => {
   return { result, elapsed: end - start };
 };
 
-measure.async = async <T>(fn: Promise<T>) => {
+measure.async = async <T>(arg: Promise<T> | (() => Promise<T>)) => {
   const start = performance.now();
 
-  const result = await fn;
+  const result = typeof arg === "function" ? await arg() : await arg;
 
   const end = performance.now();
 

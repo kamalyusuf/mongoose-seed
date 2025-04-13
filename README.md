@@ -27,8 +27,9 @@ pnpm add @kamalyb/mongoose-seed -D
 ## Usage
 
 ```typescript
+import mongoose from "mongoose";
+import { Post } from "./models/post.js";
 import { seed } from "@kamalyb/mongoose-seed";
-import { Post } from "./models/post";
 
 const Post = mongoose.model(
   "Post",
@@ -48,6 +49,8 @@ const Post = mongoose.model(
     }
   )
 );
+
+await mongoose.connect();
 
 await seed(Post, {
   quantity: 500_000 // or within range [100_000, 500_000],
@@ -71,6 +74,8 @@ await seed(Post, {
     }
   }
 });
+
+await mongoose.disconnect();
 ```
 
 ## Behaviors
