@@ -107,16 +107,18 @@ export class SchemaAnalyzer<T> {
               ? options.match[0]
               : options.match
             : undefined,
-          minlength: options.minlength
-            ? Array.isArray(options.minlength)
-              ? options.minlength[0]
-              : options.minlength
-            : undefined,
-          maxlength: options.maxlength
-            ? Array.isArray(options.maxlength)
-              ? options.maxlength[0]
-              : options.maxlength
-            : undefined
+          minlength:
+            options.minlength !== undefined
+              ? Array.isArray(options.minlength)
+                ? options.minlength[0]
+                : options.minlength
+              : undefined,
+          maxlength:
+            options.maxlength !== undefined
+              ? Array.isArray(options.maxlength)
+                ? options.maxlength[0]
+                : options.maxlength
+              : undefined
         };
       else if (type.instance === "Number")
         constraint[path] = {
@@ -125,16 +127,18 @@ export class SchemaAnalyzer<T> {
           default: options.default,
           required,
           set: options.set,
-          min: options.min
-            ? Array.isArray(options.min)
-              ? options.min[0]
-              : options.min
-            : undefined,
-          max: options.max
-            ? Array.isArray(options.max)
-              ? options.max[0]
-              : options.max
-            : undefined,
+          min:
+            options.min !== undefined
+              ? Array.isArray(options.min)
+                ? options.min[0]
+                : options.min
+              : undefined,
+          max:
+            options.max !== undefined
+              ? Array.isArray(options.max)
+                ? options.max[0]
+                : options.max
+              : undefined,
           enum: options.enum
             ? Array.isArray(options.enum)
               ? options.enum
@@ -148,16 +152,18 @@ export class SchemaAnalyzer<T> {
           default: options.default,
           required,
           set: options.set,
-          min: options.min
-            ? Array.isArray(options.min)
-              ? options.min[0]
-              : options.min
-            : undefined,
-          max: options.max
-            ? Array.isArray(options.max)
-              ? options.max[0]
-              : options.max
-            : undefined
+          min:
+            options.min !== undefined
+              ? Array.isArray(options.min)
+                ? options.min[0]
+                : options.min
+              : undefined,
+          max:
+            options.max !== undefined
+              ? Array.isArray(options.max)
+                ? options.max[0]
+                : options.max
+              : undefined
         };
       else if (type.instance === "ObjectId")
         constraint[path] = {

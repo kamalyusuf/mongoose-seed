@@ -23,7 +23,7 @@ import type {
 } from "./types.js";
 import { faker, type Faker } from "@faker-js/faker";
 import { createHash, randomUUID } from "node:crypto";
-import { matchers } from "./string-matchers.js";
+import { contexts, generic } from "./string-matchers.js";
 import { registry } from "./registry.js";
 
 export interface GeneratorOptions<T> {
@@ -135,21 +135,13 @@ export class Generator<T> {
 
     if (constraints.match) return faker.helpers.fromRegExp(constraints.match);
 
-    const path = constraints.path.toLowerCase();
-
-    if (/(password|hash)/i.test(path)) return this.#hash(constraints);
+    if (/(password|hash)/i.test(constraints.path))
+      return this.#hash(constraints);
 
     const min = constraints.minlength ?? 1;
     const max = constraints.maxlength ?? 255;
 
-    let value: string | undefined;
-
-    for (const [regex, generator] of matchers) {
-      if (regex.test(path)) {
-        value = generator();
-        break;
-      }
-    }
+    let value = this.#contextual_string_value(constraints.path);
 
     if (!value) value = this.#lorem(min, max);
 
@@ -175,18 +167,104 @@ export class Generator<T> {
   #number(constraints: NumberConstraints): number {
     if (constraints.enum) return faker.helpers.arrayElement(constraints.enum);
 
-    const min = constraints.min ?? Number.MIN_SAFE_INTEGER;
-    const max = constraints.max ?? Number.MAX_SAFE_INTEGER;
+    let precision = 0;
+    const defaults = {
+      min: Number.MIN_SAFE_INTEGER,
+      max: Number.MAX_SAFE_INTEGER
+    };
 
-    return faker.number.int({ min, max });
+    if (/age/i.test(constraints.path)) {
+      defaults.min = 18;
+      defaults.max = 90;
+      precision = 0;
+    } else if (/year/i.test(constraints.path)) {
+      defaults.min = 1970;
+      defaults.max = 2025;
+      precision = 0;
+    } else if (/(rating|score)/i.test(constraints.path)) {
+      defaults.min = 1;
+      defaults.max = 5;
+      precision = 1;
+    } else if (/(percent|percentage)/i.test(constraints.path)) {
+      defaults.min = 0;
+      defaults.max = 100;
+      precision = 2;
+    } else if (/(price|cost|amount)/i.test(constraints.path)) {
+      defaults.min = 0.99;
+      defaults.max = 999.99;
+      precision = 2;
+    } else if (/(quantity|count|stock)/i.test(constraints.path)) {
+      defaults.min = 0;
+      defaults.max = 100;
+      precision = 0;
+    } else if (/(weight)/i.test(constraints.path)) {
+      defaults.min = 0.1;
+      defaults.max = 100;
+      precision = 2;
+    } else if (/(height|width|length|depth)/i.test(constraints.path)) {
+      defaults.min = 1;
+      defaults.max = 200;
+      precision = 1;
+    } else if (/(latitude|lat)/i.test(constraints.path)) {
+      defaults.min = -90;
+      defaults.max = 90;
+      precision = 6;
+    } else if (/(longitude|long)/i.test(constraints.path)) {
+      defaults.min = -180;
+      defaults.max = 180;
+      precision = 6;
+    }
+
+    const min = constraints.min ?? defaults.min;
+    const max = constraints.max ?? defaults.max;
+
+    return faker.number.float({ min, max, fractionDigits: precision });
   }
 
   #boolean(_constraints: BooleanConstraints): boolean {
     return faker.datatype.boolean();
   }
 
-  #double(_constraints: DoubleConstraints): number {
-    return faker.number.float({ min: 1, max: 1_000_000, fractionDigits: 2 });
+  #double(constraints: DoubleConstraints): number {
+    let min = 0;
+    let max = 0;
+    let precision = 0;
+
+    if (/(rating|score)/i.test(constraints.path)) {
+      min = 1;
+      max = 5;
+      precision = 1;
+    } else if (/(percent|percentage)/i.test(constraints.path)) {
+      min = 0;
+      max = 100;
+      precision = 2;
+    } else if (/(price|cost|amount)/i.test(constraints.path)) {
+      min = 0.99;
+      max = 999.99;
+      precision = 2;
+    } else if (/(quantity|count|stock)/i.test(constraints.path)) {
+      min = 0;
+      max = 100;
+      precision = 0;
+    } else if (/(weight)/i.test(constraints.path)) {
+      min = 0.1;
+      max = 100;
+      precision = 2;
+    } else if (/(height|width|length|depth)/i.test(constraints.path)) {
+      min = 1;
+      max = 200;
+      precision = 1;
+    } else if (/(latitude|lat)/i.test(constraints.path)) {
+      min = -90;
+      max = 90;
+      precision = 6;
+    } else if (/(longitude|long)/i.test(constraints.path)) {
+      min = -180;
+      max = 180;
+      precision = 6;
+    }
+
+    return faker.number.float({ min, max, fractionDigits: precision });
   }
 
   #bigint(_constraints: BigIntConstraints): bigint {
@@ -194,10 +272,27 @@ export class Generator<T> {
   }
 
   #date(constraints: DateConstraints): Date {
-    const min = constraints.min ?? new Date(1970, 0, 1);
-    const max = constraints.max ?? new Date();
+    if (constraints.min || constraints.max)
+      return faker.date.between({
+        from: constraints.min ?? new Date(1970, 0, 1),
+        to: constraints.max ?? new Date()
+      });
 
-    return faker.date.between({ from: min, to: max });
+    if (/(birth|dob)/i.test(constraints.path)) return faker.date.birthdate();
+
+    if (/(expire|expiry|end)/i.test(constraints.path))
+      return faker.date.soon({ days: 366 });
+
+    if (/(deleted)/i.test(constraints.path))
+      return faker.date.recent({ days: 14 });
+
+    if (/(future|appointment|scheduled|upcoming)/i.test(constraints.path))
+      return faker.date.soon({ days: 30 });
+
+    if (/(past|previous)/i.test(constraints.path))
+      return faker.date.past({ years: 2 });
+
+    return faker.date.anytime();
   }
 
   #buffer(_constraints: BufferConstraints): Buffer {
@@ -353,6 +448,16 @@ export class Generator<T> {
 
         return obj;
     }
+  }
+
+  #contextual_string_value(path: string) {
+    for (const { model_pattern, matchers } of contexts)
+      if (model_pattern.test(this.#model.modelName))
+        for (const [regex, generator] of matchers)
+          if (regex.test(path)) return generator();
+
+    for (const [regex, generator] of generic)
+      if (regex.test(path)) return generator();
   }
 
   #should_generate(constraints: FieldConstraints): boolean {

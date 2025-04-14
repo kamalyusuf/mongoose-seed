@@ -11,7 +11,7 @@ Perfect for testing, development, and populating your database with mock data.
 - 🪆 Handles complex nested structures, Maps, arrays, and embedded documents
 - ⏱️ Supports automatic and custom timestamp generation
 - 📈 Includes debug mode with memory tracking and progress logging
-- 📝 Realistic data based on field names
+- 📝 Realistic data based on model and field names
 - 🔧 Customizable field generators
 - 🔗 Automatic resolution of ObjectId references (including arrays of references)
 

@@ -127,7 +127,7 @@ export const seed = async <T>(
     const final_memory = memory_usage();
 
     success(
-      `[${model.modelName}] Seeded ${result.result.insertedCount.toLocaleString()} documents in ${result.elapsed}ms`
+      `[${model.modelName}] Seeded ${result.result.insertedCount.toLocaleString()} / ${quantity.toLocaleString()} documents in ${result.elapsed}ms`
     );
 
     warning(`[${model.modelName}] Final memory usage:
