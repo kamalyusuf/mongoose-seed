@@ -45,7 +45,8 @@ export class Registry {
     parent: Model<any>,
     ref_model: string
   ): Promise<Types.ObjectId[]> {
-    const Ref = parent.db.model(ref_model);
+    const Ref =
+      parent.modelName === ref_model ? parent : parent.db.model(ref_model);
 
     if (!Ref)
       throw new Error(
@@ -56,14 +57,14 @@ export class Registry {
       Ref.find({}, { _id: 1 }).lean()
     );
 
-    info(
-      `[${Ref.modelName}] Loaded ${docs.length.toLocaleString()} reference documents for resolving ${parent.modelName} references in ${elapsed}ms`
-    );
-
     if (!docs.length)
       throw new Error(
         `Reference resolution failed: The '${ref_model}' collection contains no documents. Please seed the '${ref_model}' collection before attempting to seed documents that reference it.`
       );
+
+    info(
+      `[${Ref.modelName}] Loaded ${docs.length.toLocaleString()} reference documents for resolving ${parent.modelName} references in ${elapsed}ms`
+    );
 
     this.#documents.set(ref_model, docs as any);
 

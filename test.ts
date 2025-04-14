@@ -1,5 +1,5 @@
-import { seed } from "./src/seeder.js";
 import mongoose from "mongoose";
+import { seed } from "./src/seeder.js";
 
 const schema = new mongoose.Schema(
   {
@@ -83,8 +83,6 @@ try {
     optional_field_probability: 1,
     generators: {}
   });
-
-  // console.log(result);
 } catch (e) {
   const error = e as Error;
 
