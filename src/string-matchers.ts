@@ -18,13 +18,18 @@ export const contexts: ContextBias[] = [
       [/\b(full_?)?name\b/i, faker.person.fullName],
       [/\bname\b/i, faker.person.fullName],
       [/\busername\b/i, faker.internet.username],
-      [/\bemail\b/i, faker.internet.email],
+      [/\b(email(_?address)?)\b/i, faker.internet.email],
       [/\bavatar|photo|picture|image\b/i, faker.image.avatar],
-      [/\bphone|mobile|cell|tel\b/i, faker.phone.number],
+      [
+        /\b(phone|mobile|cell|telephone)(_?(number|no))?\b/i,
+        () => faker.phone.number()
+      ],
       [/\bgender\b/i, faker.person.sexType],
       [/\b(job|position|title)\b/i, faker.person.jobTitle],
       [/\bbio|about|description\b/i, faker.person.bio],
-      [/\baddress\b/i, faker.location.streetAddress],
+      [/\b(street|address)(_?(line|1))?\b/i, faker.location.streetAddress],
+      [/\b(address_?line2|apt|suite|unit)\b/i, faker.location.secondaryAddress],
+      [/\b(zip|postal)(_?code)?\b/i, faker.location.zipCode],
       [
         /\brole|permission\b/i,
         () => faker.helpers.arrayElement(["user", "admin", "super-admin"])
@@ -39,7 +44,39 @@ export const contexts: ContextBias[] = [
             "suspended"
           ])
       ],
-      [/\b(dob|birth(day|date))\b/i, () => faker.date.birthdate().toISOString()]
+      [
+        /\b(dob|birth(day|date))\b/i,
+        () => faker.date.birthdate().toISOString()
+      ],
+      [/\b(job|position|occupation|title|role)\b/i, faker.person.jobTitle],
+      [/\b(company|employer|organization)\b/i, faker.company.name],
+      [/\b(department|division|unit)\b/i, faker.commerce.department],
+      [/\b(website|url|blog|portfolio)\b/i, faker.internet.url],
+      [/\b(avatar|profile_?pic|image)\b/i, faker.image.avatar],
+      [
+        /\b(social|twitter|instagram|facebook|linkedin)\b/i,
+        () => `@${faker.internet.username()}`
+      ],
+      [
+        /\b(password|passphrase|pin)(_?hash)?\b/i,
+        () => faker.internet.password()
+      ],
+      [
+        /\b(locale|language)\b/i,
+        () => faker.helpers.arrayElement(["en", "es", "fr", "de", "ja"])
+      ],
+      [/\btimezone\b/i, faker.location.timeZone],
+      [
+        /\bpreferences\b/i,
+        () =>
+          JSON.stringify({
+            theme: faker.helpers.arrayElement(["light", "dark"])
+          })
+      ],
+      [
+        /\bverification_?status\b/i,
+        () => faker.helpers.arrayElement(["verified", "unverified", "pending"])
+      ]
     ]
   },
 
@@ -55,7 +92,7 @@ export const contexts: ContextBias[] = [
       [/\b(brand|manufacturer)\b/i, faker.company.name],
       [/\b(material)\b/i, faker.commerce.productMaterial],
       [/\b(sku|code)\b/i, () => faker.string.alphanumeric(8).toUpperCase()],
-      [/\bbarcode|ean|upc\b/i, () => faker.string.numeric(13)],
+      [/\bbarcode|ean|upc|isbn\b/i, () => faker.string.numeric(13)],
       [
         /\b(stock|quantity|inventory)\b/i,
         () => faker.number.int({ min: 0, max: 1000 }).toString()
@@ -84,7 +121,12 @@ export const contexts: ContextBias[] = [
         () =>
           faker.number.float({ min: 0, max: 0.5, fractionDigits: 2 }).toString()
       ],
-      [/\bimage|photo|thumbnail\b/i, faker.image.url]
+      [/\bimage|photo|thumbnail\b/i, faker.image.url],
+      [
+        /\b(condition)\b/i,
+        () =>
+          faker.helpers.arrayElement(["new", "used", "refurbished", "open box"])
+      ]
     ]
   },
   {
@@ -159,12 +201,13 @@ export const contexts: ContextBias[] = [
     model_pattern: /blog|post|article|content|news|publication/i,
     matchers: [
       [/\b(title|headline)\b/i, faker.lorem.sentence],
-      [/\b(body|content|message|text|paragraph)\b/i, faker.lorem.paragraphs],
+      [/\b(body|content|html|text|copy)\b/i, faker.lorem.paragraphs],
+      [/\b(caption|alt_?text)\b/i, faker.lorem.sentence],
       [/\b(summary|excerpt|snippet)\b/i, faker.lorem.paragraph],
       [/\b(tag|tags)\b/i, () => faker.lorem.words(3).split(" ").join(",")],
       [
-        /\b(slug)\b/i,
-        () => faker.helpers.slugify(faker.lorem.words(3).toLowerCase())
+        /\b(slug|permalink)\b/i,
+        () => faker.helpers.slugify(faker.lorem.words(3))
       ],
       [
         /\b(published|created|date)\b/i,
@@ -202,20 +245,25 @@ export const contexts: ContextBias[] = [
       [/\b(street|address|line1)\b/i, faker.location.streetAddress],
       [/\b(street2|line2|apt|suite)\b/i, faker.location.secondaryAddress],
       [/\b(city|town)\b/i, faker.location.city],
-      [/\b(state|province|region)\b/i, faker.location.state],
+      [/\b(state|province|region|county)\b/i, faker.location.state],
       [/\b(country)\b/i, faker.location.country],
-      [/\b(postal_?code|zip)\b/i, faker.location.zipCode],
-      [/\b(latitude|lat)\b/i, () => faker.location.latitude().toString()],
-      [/\b(longitude|lng|lon)\b/i, () => faker.location.longitude().toString()],
+      [/\b(zip|postal)(_?code)?\b/i, faker.location.zipCode],
       [
-        /\b(coordinates)\b/i,
+        /\b(coordinates|lat_lng|position)\b/i,
         () => `${faker.location.latitude()},${faker.location.longitude()}`
       ],
-      [/\b(timezone)\b/i, faker.location.timeZone],
+      [/\b(latitude|lat)\b/i, () => faker.location.latitude().toString()],
+      [/\b(longitude|lng|lon)\b/i, () => faker.location.longitude().toString()],
       [/\b(county|district)\b/i, faker.location.county],
       [
         /\b(building|apartment|suite|unit)_?(number|num|no)?\b/i,
         faker.location.buildingNumber
+      ],
+      [/\b(iso_?code|country_?code)\b/i, () => faker.location.countryCode()],
+      [/\b(timezone|tz)\b/i, faker.location.timeZone],
+      [
+        /\b(area_?code)\b/i,
+        () => faker.number.int({ min: 100, max: 999 }).toString()
       ]
     ]
   },
@@ -386,6 +434,11 @@ export const contexts: ContextBias[] = [
         /\b(path|url|location)\b/i,
         () => `uploads/${faker.system.commonFileName()}`
       ],
+      [
+        /\b(url|link|uri)\b/i,
+        () => `https://cdn.example.com/${faker.system.filePath()}`
+      ],
+      [/\b(thumbnail|preview)(_?url)?\b/i, faker.image.url],
       [/\b(type|mime|mime_?type)\b/i, faker.system.mimeType],
       [
         /\b(size)\b/i,
@@ -402,7 +455,17 @@ export const contexts: ContextBias[] = [
         () =>
           `${faker.number.int({ min: 800, max: 3000 })}x${faker.number.int({ min: 600, max: 2000 })}`
       ],
-      [/\b(duration)\b/i, () => `${faker.number.int({ min: 10, max: 3600 })}s`]
+      [/\b(duration)\b/i, () => `${faker.number.int({ min: 10, max: 3600 })}s`],
+      [/\b(type|mime_?type)\b/i, faker.system.mimeType],
+      [/\b(extension|ext)\b/i, faker.system.fileExt],
+      [
+        /\b(format)\b/i,
+        () => faker.helpers.arrayElement(["jpg", "png", "pdf", "docx", "mp4"])
+      ],
+      [
+        /\b(encoding)\b/i,
+        () => faker.helpers.arrayElement(["7bit", "binary", "base64"])
+      ]
     ]
   },
 
@@ -459,17 +522,93 @@ export const contexts: ContextBias[] = [
 
   // IoT / Sensor
   {
-    model_pattern: /iot|sensor|device|measurement|telemetry/i,
+    model_pattern: /iot|sensor|device|measurement|telemetry|smart_?home/i,
     matchers: [
       [/\b(device|sensor)_?id\b/i, () => faker.string.uuid()],
       [
-        /\b(reading|measurement)\b/i,
+        /\bname\b/i,
+        () => `${faker.word.adjective()} ${faker.word.noun()} Sensor`
+      ],
+      [
+        /\bmodel\b/i,
+        () =>
+          `${faker.string.alphanumeric(2).toUpperCase()}-${faker.number.int({ min: 100, max: 999 })}`
+      ],
+      [/\bmanufacturer\b/i, faker.company.name],
+      [
+        /\bfirmware|version\b/i,
+        () =>
+          `${faker.number.int({ min: 1, max: 9 })}.${faker.number.int({ min: 0, max: 99 })}.${faker.number.int({ min: 0, max: 99 })}`
+      ],
+      [
+        /\b(reading|measurement|value|data)\b/i,
+        () =>
+          faker.number.float({ min: 0, max: 100, fractionDigits: 2 }).toString()
+      ],
+      [
+        /\b(unit|measure)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "°C",
+            "°F",
+            "%",
+            "hPa",
+            "lux",
+            "ppm",
+            "m/s"
+          ])
+      ],
+      [
+        /\b(battery|power)\b/i,
+        () => `${faker.number.int({ min: 0, max: 100 })}%`
+      ],
+      [
+        /\b(location|position|placement)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "Living Room",
+            "Kitchen",
+            "Bedroom",
+            "Bathroom",
+            "Garage",
+            "Garden",
+            "Office"
+          ])
+      ],
+      [/\bip\b/i, faker.internet.ip],
+      [/\bmac(_address)?\b/i, () => faker.number.hex(12)],
+      [/\b(latitude|lat)\b/i, () => faker.location.latitude().toString()],
+      [/\b(longitude|lng|lon)\b/i, () => faker.location.longitude().toString()],
+      [
+        /\bconnection|connectivity\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "WiFi",
+            "Bluetooth",
+            "Zigbee",
+            "Z-Wave",
+            "LoRa",
+            "Cellular",
+            "Ethernet"
+          ])
+      ],
+      [/\blast_?update|last_?seen\b/i, () => faker.date.recent().toISOString()],
+      [
+        /\blogger|threshold\b/i,
         () =>
           faker.number.float({ min: 0, max: 100, fractionDigits: 1 }).toString()
       ],
       [
         /\b(status)\b/i,
-        () => faker.helpers.arrayElement(["active", "inactive", "error"])
+        () =>
+          faker.helpers.arrayElement([
+            "online",
+            "offline",
+            "standby",
+            "error",
+            "maintenance",
+            "low_battery"
+          ])
       ],
       [/\b(timestamp|time)\b/i, () => new Date().toISOString()]
     ]
@@ -671,7 +810,7 @@ export const contexts: ContextBias[] = [
 
   // Authentication / Security
   {
-    model_pattern: /auth|login|signup|security|session/i,
+    model_pattern: /auth|login|signup|security|session|apikey/i,
     matchers: [
       [/\btoken\b/i, () => faker.string.alphanumeric(64)],
       [/\bpassword|hash\b/i, () => faker.string.alphanumeric(60)],
@@ -759,6 +898,784 @@ export const contexts: ContextBias[] = [
           ])
       ],
       [/\b(url|link)\b/i, faker.internet.url]
+    ]
+  },
+
+  // Notification / Communication / Chat / Messaging
+  {
+    model_pattern:
+      /chat|thread|inbox|notification|message|alert|announcement|communication/i,
+    matchers: [
+      [/\b(title|subject|topic)\b/i, faker.lorem.sentence],
+      [/\b(content|text|message|body)\b/i, faker.lorem.paragraph],
+      [
+        /\b(type|category)\b/i,
+        () =>
+          faker.helpers.arrayElement(["info", "warning", "error", "success"])
+      ],
+      [
+        /\b(priority|urgency)\b/i,
+        () => faker.helpers.arrayElement(["low", "medium", "high", "critical"])
+      ],
+      [/\b(sender|from|author|user)\b/i, faker.internet.username],
+      [/\b(recipient|to|receiver)\b/i, faker.internet.username],
+      [
+        /\b(channel)\b/i,
+        () => faker.helpers.arrayElement(["email", "sms", "push", "in-app"])
+      ],
+      [
+        /\b(template|template_id)\b/i,
+        () => `tpl-${faker.string.alphanumeric(8).toUpperCase()}`
+      ],
+      [
+        /\b(status)\b/i,
+        () =>
+          faker.helpers.arrayElement(["sent", "delivered", "failed", "read"])
+      ]
+    ]
+  },
+
+  // API / Integration Systems
+  {
+    model_pattern: /api|endpoint|integration|webhook|service/i,
+    matchers: [
+      [/\b(name|title)\b/i, faker.lorem.words],
+      [
+        /\b(endpoint|url)\b/i,
+        () =>
+          `${faker.internet.url()}/api/v${faker.number.int({ min: 1, max: 3 })}`
+      ],
+      [
+        /\b(method|http_method)\b/i,
+        () =>
+          faker.helpers.arrayElement(["GET", "POST", "PUT", "DELETE", "PATCH"])
+      ],
+      [/\b(version)\b/i, () => `v${faker.number.int({ min: 1, max: 5 })}`],
+      [/\b(api_key|token)\b/i, () => faker.string.alphanumeric(32)],
+      [/\b(secret)\b/i, () => faker.string.alphanumeric(64)],
+      [
+        /\b(status)\b/i,
+        () => faker.helpers.arrayElement(["active", "inactive", "deprecated"])
+      ],
+      [
+        /\b(rate_limit)\b/i,
+        () => faker.number.int({ min: 100, max: 10000 }).toString()
+      ]
+    ]
+  },
+
+  // Configuration / Settings
+  {
+    model_pattern: /config|setting|preference|option|parameter/i,
+    matchers: [
+      [/\b(key|name)\b/i, faker.lorem.word],
+      [/\b(value)\b/i, faker.lorem.word],
+      [/\b(description)\b/i, faker.lorem.sentence],
+      [
+        /\b(type)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "string",
+            "number",
+            "boolean",
+            "json",
+            "array"
+          ])
+      ],
+      [/\b(category|group)\b/i, faker.lorem.word],
+      [/\b(default)\b/i, faker.lorem.word],
+      [
+        /\b(environment)\b/i,
+        () =>
+          faker.helpers.arrayElement(["development", "staging", "production"])
+      ],
+      [
+        /\b(is_sensitive|protected)\b/i,
+        () => faker.datatype.boolean().toString()
+      ],
+      [/\b(last_modified)\b/i, () => faker.date.recent().toISOString()]
+    ]
+  },
+
+  // Audit / Logging
+  {
+    model_pattern: /audit|log|activity|history|changelog/i,
+    matchers: [
+      [
+        /\b(action|operation)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "create",
+            "update",
+            "delete",
+            "view",
+            "export"
+          ])
+      ],
+      [/\b(actor|user)\b/i, faker.internet.userName],
+      [/\b(ip_address)\b/i, faker.internet.ip],
+      [/\b(resource|target)\b/i, faker.system.fileName],
+      [/\b(timestamp|time)\b/i, () => faker.date.recent().toISOString()],
+      [/\b(details|changes)\b/i, faker.lorem.sentence],
+      [
+        /\b(status)\b/i,
+        () => faker.helpers.arrayElement(["success", "failure", "pending"])
+      ],
+      [/\b(correlation_id|request_id)\b/i, () => faker.string.uuid()],
+      [
+        /\b(severity|level)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "critical"
+          ])
+      ]
+    ]
+  },
+
+  // NEW: Subscription / Membership
+  {
+    model_pattern: /subscription|membership|plan|tier|billing/i,
+    matchers: [
+      [
+        /\b(name|title|plan)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "Basic",
+            "Premium",
+            "Professional",
+            "Enterprise",
+            "Free",
+            "Standard",
+            "Plus",
+            "Ultimate"
+          ])
+      ],
+      [/\b(description)\b/i, faker.lorem.sentence],
+      [
+        /\b(price|amount|cost|fee)\b/i,
+        () => faker.commerce.price({ min: 5, max: 100 })
+      ],
+      [/\b(currency)\b/i, () => faker.finance.currencyCode()],
+      [
+        /\b(interval|period|frequency)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "monthly",
+            "annually",
+            "weekly",
+            "quarterly",
+            "daily"
+          ])
+      ],
+      [
+        /\b(trial(_period|_days)?)\b/i,
+        () => faker.number.int({ min: 0, max: 30 }).toString()
+      ],
+      [
+        /\b(active|status)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "active",
+            "canceled",
+            "expired",
+            "pending",
+            "past_due"
+          ])
+      ],
+      [
+        /\b(created|start_date|subscribed_at)\b/i,
+        () => faker.date.past().toISOString()
+      ],
+      [
+        /\b(expires|end_date|renewal_date)\b/i,
+        () => faker.date.future().toISOString()
+      ],
+      [/\b(canceled_at)\b/i, () => faker.date.recent().toISOString()],
+      [
+        /\b(max_users|seats)\b/i,
+        () => faker.number.int({ min: 1, max: 100 }).toString()
+      ],
+      [
+        /\b(payment_method)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "credit_card",
+            "paypal",
+            "bank_transfer",
+            "crypto"
+          ])
+      ]
+    ]
+  },
+
+  // NEW: Sports / Athletics
+  {
+    model_pattern:
+      /sport|athlete|team|match|game|tournament|league|competition/i,
+    matchers: [
+      [
+        /\b(name|title|team)\b/i,
+        () => `${faker.location.city()} ${faker.animal.type()}s`
+      ],
+      [/\b(player|athlete|participant)\b/i, faker.person.fullName],
+      [
+        /\b(sport|game|activity)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "Football",
+            "Basketball",
+            "Baseball",
+            "Soccer",
+            "Tennis",
+            "Hockey",
+            "Golf",
+            "Rugby",
+            "Cricket",
+            "Volleyball"
+          ])
+      ],
+      [
+        /\b(league|conference|division)\b/i,
+        () => `${faker.word.adjective()} ${faker.word.noun()} League`
+      ],
+      [
+        /\b(score|points|result)\b/i,
+        () =>
+          `${faker.number.int({ min: 0, max: 100 })}-${faker.number.int({ min: 0, max: 100 })}`
+      ],
+      [
+        /\b(position|role)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "Forward",
+            "Defense",
+            "Goalkeeper",
+            "Striker",
+            "Quarterback",
+            "Center",
+            "Pitcher",
+            "Guard"
+          ])
+      ],
+      [
+        /\b(jersey|number)\b/i,
+        () => faker.number.int({ min: 1, max: 99 }).toString()
+      ],
+      [
+        /\b(venue|stadium|arena|field|court)\b/i,
+        () => `${faker.company.name()} Stadium`
+      ],
+      [/\b(start|date|scheduled)\b/i, () => faker.date.future().toISOString()],
+      [
+        /\b(duration|length|time)\b/i,
+        () => `${faker.number.int({ min: 90, max: 180 })} minutes`
+      ],
+      [
+        /\b(season|year)\b/i,
+        () => faker.date.recent().getFullYear().toString()
+      ],
+      [
+        /\b(rank|standing|position)\b/i,
+        () => faker.number.int({ min: 1, max: 20 }).toString()
+      ],
+      [
+        /\b(win|victory|loss|defeat)\b/i,
+        () => faker.datatype.boolean().toString()
+      ],
+      [/\b(home|away)\b/i, () => faker.datatype.boolean().toString()],
+      [
+        /\b(status)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "scheduled",
+            "in_progress",
+            "finished",
+            "canceled",
+            "postponed"
+          ])
+      ]
+    ]
+  },
+
+  // ML/AI Models and Data
+  {
+    model_pattern: /ai|ml|model|dataset|training|prediction|algorithm/i,
+    matchers: [
+      [
+        /\b(name|title|model_name)\b/i,
+        () =>
+          `${faker.word.adjective()}-${faker.word.noun()}-${faker.number.int({ min: 1, max: 999 })}`
+      ],
+      [/\b(description)\b/i, faker.lorem.paragraph],
+      [
+        /\b(version|release)\b/i,
+        () =>
+          `${faker.number.int({ min: 0, max: 5 })}.${faker.number.int({ min: 0, max: 9 })}.${faker.number.int({ min: 0, max: 9 })}`
+      ],
+      [
+        /\b(accuracy|precision|recall|f1|score)\b/i,
+        () =>
+          faker.number
+            .float({ min: 0.7, max: 0.99, fractionDigits: 4 })
+            .toString()
+      ],
+      [
+        /\b(parameters|params)\b/i,
+        () => faker.number.int({ min: 10000, max: 175000000000 }).toString()
+      ],
+      [
+        /\b(epochs|iterations|steps)\b/i,
+        () => faker.number.int({ min: 10, max: 1000 }).toString()
+      ],
+      [
+        /\b(learning_rate|lr)\b/i,
+        () =>
+          faker.number
+            .float({ min: 0.0001, max: 0.1, fractionDigits: 6 })
+            .toString()
+      ],
+      [
+        /\b(batch_size)\b/i,
+        () => faker.helpers.arrayElement(["8", "16", "32", "64", "128", "256"])
+      ],
+      [
+        /\b(framework|library)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "TensorFlow",
+            "PyTorch",
+            "Keras",
+            "JAX",
+            "scikit-learn",
+            "XGBoost"
+          ])
+      ],
+      [
+        /\b(dataset|data)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "MNIST",
+            "ImageNet",
+            "CIFAR-10",
+            "COCO",
+            "WikiText",
+            "Custom"
+          ])
+      ],
+      [
+        /\b(loss|error)\b/i,
+        () =>
+          faker.number
+            .float({ min: 0.01, max: 2.5, fractionDigits: 4 })
+            .toString()
+      ],
+      [
+        /\b(training_time|duration)\b/i,
+        () => `${faker.number.int({ min: 1, max: 100 })} hours`
+      ],
+      [
+        /\b(gpu|hardware)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "NVIDIA A100",
+            "NVIDIA V100",
+            "NVIDIA RTX 3090",
+            "TPU v3",
+            "CPU only"
+          ])
+      ],
+      [
+        /\b(status)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "training",
+            "completed",
+            "failed",
+            "evaluating",
+            "deployed"
+          ])
+      ],
+      [/\b(created_at|trained_at)\b/i, () => faker.date.recent().toISOString()]
+    ]
+  },
+
+  // NEW: Library / Content Management / Publishing
+  {
+    model_pattern:
+      /library|book|publication|author|catalog|archive|collection/i,
+    matchers: [
+      [/\b(title|name)\b/i, faker.lorem.words],
+      [/\b(author|writer|creator)\b/i, faker.person.fullName],
+      [/\b(isbn|id|code)\b/i, () => faker.string.numeric(13)],
+      [/\b(publisher|press)\b/i, faker.company.name],
+      [/\b(published|release_date)\b/i, () => faker.date.past().toISOString()],
+      [
+        /\b(pages|length)\b/i,
+        () => faker.number.int({ min: 50, max: 1200 }).toString()
+      ],
+      [
+        /\b(language)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "English",
+            "Spanish",
+            "French",
+            "German",
+            "Chinese",
+            "Japanese"
+          ])
+      ],
+      [
+        /\b(genre|category)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "Fiction",
+            "Non-fiction",
+            "Science",
+            "History",
+            "Biography",
+            "Fantasy",
+            "Romance",
+            "Mystery"
+          ])
+      ],
+      [/\b(summary|description|blurb)\b/i, faker.lorem.paragraph],
+      [/\b(cover|image|thumbnail)\b/i, faker.image.url],
+      [
+        /\b(edition|version)\b/i,
+        () => faker.number.int({ min: 1, max: 10 }).toString()
+      ],
+      [
+        /\b(rating|score)\b/i,
+        () =>
+          faker.number.float({ min: 1, max: 5, fractionDigits: 1 }).toString()
+      ],
+      [
+        /\b(reviews|ratings)\b/i,
+        () => faker.number.int({ min: 0, max: 5000 }).toString()
+      ],
+      [/\b(available|in_stock)\b/i, () => faker.datatype.boolean().toString()],
+      [
+        /\b(borrowed|checked_out)\b/i,
+        () => faker.datatype.boolean().toString()
+      ],
+      [/\b(due_date|return_date)\b/i, () => faker.date.future().toISOString()],
+      [
+        /\b(status|condition)\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "available",
+            "checked_out",
+            "reserved",
+            "lost",
+            "damaged"
+          ])
+      ]
+    ]
+  },
+
+  // Human Resources
+  {
+    model_pattern: /hr|human[- ]?resources|employee|staff|personnel/i,
+    matchers: [
+      [/\bemployee_?id\b/i, () => `EMP-${faker.string.alphanumeric(8)}`],
+      [/\bdepartment\b/i, faker.commerce.department],
+      [/\bposition|job_?title\b/i, faker.person.jobTitle],
+      [/\bsalary\b/i, () => faker.finance.amount({ min: 30000, max: 200000 })],
+      [/\bhire_?date\b/i, () => faker.date.past({ years: 10 }).toISOString()],
+      [/\bmanager\b/i, faker.person.fullName],
+      [/\bemergency_?contact\b/i, faker.phone.number],
+      [
+        /\bemployment_?type\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "Full-time",
+            "Part-time",
+            "Contract",
+            "Temporary"
+          ])
+      ],
+      [
+        /\bstatus\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "active",
+            "on leave",
+            "terminated",
+            "retired"
+          ])
+      ],
+      [
+        /\bperformance\b/i,
+        () =>
+          faker.helpers.arrayElement(["exceeds", "meets", "needs improvement"])
+      ]
+    ]
+  },
+
+  // Legal / Contracts
+  {
+    model_pattern: /legal|contract|agreement|clause|terms|law/i,
+    matchers: [
+      [/\bcontract_?id\b/i, () => `CNT-${faker.string.alphanumeric(8)}`],
+      [
+        /\bparties\b/i,
+        () => `${faker.company.name()} and ${faker.company.name()}`
+      ],
+      [/\beffective_?date\b/i, () => faker.date.future().toISOString()],
+      [
+        /\bexpiration_?date\b/i,
+        () => faker.date.future({ years: 5 }).toISOString()
+      ],
+      [
+        /\bstatus\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "draft",
+            "active",
+            "expired",
+            "terminated"
+          ])
+      ],
+      [/\bjurisdiction\b/i, faker.location.country],
+      [
+        /\bversion\b/i,
+        () => `v${faker.number.int({ min: 1, max: 5 })}.${faker.number.int(9)}`
+      ],
+      [/\bterms\b/i, faker.lorem.paragraphs],
+      [/\bsignature\b/i, () => `signed by ${faker.person.fullName()}`]
+    ]
+  },
+
+  // Insurance
+  {
+    model_pattern: /insurance|policy|claim|coverage|premium/i,
+    matchers: [
+      [/\bpolicy_?number\b/i, () => `PLCY-${faker.string.alphanumeric(8)}`],
+      [/\bclaim_?number\b/i, () => `CLM-${faker.string.alphanumeric(8)}`],
+      [/\binsured\b/i, faker.person.fullName],
+      [/\bprovider\b/i, faker.company.name],
+      [/\bpremium\b/i, () => faker.finance.amount({ min: 100, max: 1000 })],
+      [
+        /\bcoverage\b/i,
+        () => faker.finance.amount({ min: 10000, max: 1000000 })
+      ],
+      [
+        /\btype\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "auto",
+            "home",
+            "life",
+            "health",
+            "travel"
+          ])
+      ],
+      [
+        /\bstatus\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "active",
+            "expired",
+            "pending",
+            "canceled"
+          ])
+      ],
+      [/\bdeductible\b/i, () => faker.finance.amount({ min: 100, max: 5000 })],
+      [/\bagent\b/i, faker.person.fullName]
+    ]
+  },
+
+  // Government / Public Sector
+  {
+    model_pattern: /government|govt|public|citizen|voter|tax/i,
+    matchers: [
+      [
+        /\bssn|social_?security\b/i,
+        () =>
+          faker.string.numeric(9).replace(/^(\d{3})(\d{2})(\d{4})$/, "$1-$2-$3")
+      ],
+      [/\bpassport\b/i, () => faker.string.alphanumeric(9).toUpperCase()],
+      [
+        /\bdriver_?license\b/i,
+        () => faker.string.alphanumeric(10).toUpperCase()
+      ],
+      [/\btax_?id\b/i, () => faker.string.numeric(9)],
+      [/\bcase_?number\b/i, () => faker.string.numeric(10)],
+      [/\blicense_?plate\b/i, () => faker.vehicle.vrm()],
+      [/\bdistrict\b/i, faker.location.county],
+      [/\bconstituency\b/i, faker.location.state]
+    ]
+  },
+
+  // Non-Profit / Charity
+  {
+    model_pattern: /non[- ]?profit|charity|donation|ngo|foundation/i,
+    matchers: [
+      [/\bdonation_?id\b/i, () => `DON-${faker.string.alphanumeric(8)}`],
+      [/\bdonor\b/i, faker.person.fullName],
+      [/\bcampaign\b/i, faker.lorem.words],
+      [/\bamount\b/i, () => faker.finance.amount({ min: 10, max: 10000 })],
+      [
+        /\bcause\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "education",
+            "health",
+            "environment",
+            "animals"
+          ])
+      ],
+      [
+        /\bmembership_?level\b/i,
+        () =>
+          faker.helpers.arrayElement(["bronze", "silver", "gold", "platinum"])
+      ],
+      [/\bvolunteer\b/i, faker.person.fullName],
+      [/\bmission\b/i, faker.company.catchPhrase]
+    ]
+  },
+
+  // Technology / IT
+  {
+    model_pattern:
+      /tech|technology|it|software|hardware|system|server|network/i,
+    matchers: [
+      [/\bip_?address\b/i, faker.internet.ip],
+      [/\bmac_?address\b/i, faker.internet.mac],
+      [/\bhostname\b/i, faker.internet.domainWord],
+      [/\bdomain\b/i, faker.internet.domainName],
+      [
+        /\bos|operating_?system\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "Windows",
+            "macOS",
+            "Linux",
+            "Android",
+            "iOS"
+          ])
+      ],
+      [
+        /\bbrowser\b/i,
+        () =>
+          faker.helpers.arrayElement(["Chrome", "Firefox", "Safari", "Edge"])
+      ],
+      [
+        /\bversion\b/i,
+        () =>
+          `${faker.number.int({ min: 1, max: 20 })}.${faker.number.int(9)}.${faker.number.int(99)}`
+      ],
+      [
+        /\bserial_?number\b/i,
+        () => faker.string.alphanumeric(12).toUpperCase()
+      ],
+      [
+        /\bmodel_?number\b/i,
+        () => `${faker.string.alpha(2)}-${faker.string.numeric(4)}`
+      ],
+      [/\basset_?tag\b/i, () => `AST-${faker.string.alphanumeric(6)}`]
+    ]
+  },
+
+  // Manufacturing
+  {
+    model_pattern:
+      /manufacturing|factory|plant|production|assembly|supply_?chain/i,
+    matchers: [
+      [/\bbatch_?number\b/i, () => `BCH-${faker.string.alphanumeric(8)}`],
+      [
+        /\bserial_?number\b/i,
+        () => faker.string.alphanumeric(12).toUpperCase()
+      ],
+      [/\bwork_?order\b/i, () => `WO-${faker.string.alphanumeric(8)}`],
+      [/\boperator\b/i, faker.person.fullName],
+      [
+        /\bshift\b/i,
+        () => faker.helpers.arrayElement(["morning", "afternoon", "night"])
+      ],
+      [
+        /\bqc_?status\b/i,
+        () => faker.helpers.arrayElement(["passed", "failed", "pending"])
+      ],
+      [/\byield\b/i, () => `${faker.number.int({ min: 80, max: 100 })}%`],
+      [
+        /\bdefect_?rate\b/i,
+        () => `${faker.number.float({ min: 0.1, max: 5, fractionDigits: 2 })}%`
+      ]
+    ]
+  },
+
+  // Energy / Utilities
+  {
+    model_pattern: /energy|utility|power|electric|water|gas|oil/i,
+    matchers: [
+      [/\bmeter_?number\b/i, () => faker.string.numeric(10)],
+      [/\baccount_?number\b/i, () => faker.string.numeric(12)],
+      [
+        /\bconsumption\b/i,
+        () => `${faker.number.int({ min: 100, max: 2000 })} kWh`
+      ],
+      [/\bbill_?amount\b/i, () => faker.finance.amount({ min: 50, max: 500 })],
+      [
+        /\breading\b/i,
+        () => faker.number.int({ min: 10000, max: 99999 }).toString()
+      ],
+      [
+        /\bservice_?type\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "residential",
+            "commercial",
+            "industrial"
+          ])
+      ],
+      [
+        /\btariff\b/i,
+        () =>
+          faker.helpers.arrayElement(["standard", "time-of-use", "flat-rate"])
+      ]
+    ]
+  },
+
+  // Sports / Fitness
+  {
+    model_pattern: /sport|fitness|athlete|team|game|match|workout/i,
+    matchers: [
+      [/\bplayer_?name\b/i, faker.person.fullName],
+      [/\bteam\b/i, faker.company.name],
+      [
+        /\bposition\b/i,
+        () =>
+          faker.helpers.arrayElement([
+            "forward",
+            "midfielder",
+            "defender",
+            "goalkeeper"
+          ])
+      ],
+      [/\bscore\b/i, () => faker.number.int({ min: 0, max: 100 }).toString()],
+      [
+        /\bstatistics\b/i,
+        () =>
+          `${faker.number.int(50)}/${faker.number.int(30)}/${faker.number.int(20)}`
+      ],
+      [
+        /\bworkout_?type\b/i,
+        () => faker.helpers.arrayElement(["cardio", "strength", "HIIT", "yoga"])
+      ],
+      [
+        /\bduration\b/i,
+        () => `${faker.number.int({ min: 15, max: 120 })} minutes`
+      ],
+      [
+        /\bheart_?rate\b/i,
+        () => faker.number.int({ min: 60, max: 190 }).toString()
+      ]
     ]
   }
 ];

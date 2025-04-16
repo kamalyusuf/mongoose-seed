@@ -6,9 +6,24 @@ export interface AnalyzerOptions<T> {
 }
 
 export class SchemaAnalyzer<T> {
+  #main: Schema;
+
   #exclude: string[] = ["_id", "__v"];
 
-  constructor({ exclude }: AnalyzerOptions<T> = {}) {
+  labels: {
+    timestamps: {
+      created?: string;
+      updated?: string;
+    };
+  };
+
+  constructor(schema: Schema, { exclude }: AnalyzerOptions<T> = {}) {
+    this.#main = schema;
+
+    this.labels = {
+      timestamps: this.extract_timestamp_labels(this.#main)
+    };
+
     if (exclude?.length) this.#exclude = this.#exclude.concat(exclude as any);
   }
 
@@ -185,6 +200,40 @@ export class SchemaAnalyzer<T> {
     });
 
     return constraint;
+  }
+
+  extract_timestamp_labels(schema: Schema): {
+    created?: string;
+    updated?: string;
+  } {
+    const options = schema.get("timestamps");
+
+    if (options === true)
+      return {
+        created: "createdAt",
+        updated: "updatedAt"
+      };
+
+    if (!options) return {};
+
+    const fields: { created?: string; updated?: string } = {};
+
+    if (typeof options.createdAt === "string")
+      fields.created = options.createdAt;
+    else if (options.createdAt === true) fields.created = "createdAt";
+
+    if (typeof options.updatedAt === "string")
+      fields.updated = options.updatedAt;
+    else if (options.updatedAt === true) fields.updated = "updatedAt";
+
+    return fields;
+  }
+
+  is_timestamp_field(path: string): boolean {
+    return (
+      this.labels.timestamps.created === path ||
+      this.labels.timestamps.updated === path
+    );
   }
 
   #nested_array(caster: AnyObject) {

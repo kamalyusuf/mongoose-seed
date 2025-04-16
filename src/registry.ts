@@ -1,6 +1,7 @@
 import { faker } from "@faker-js/faker";
 import type { Model, Types } from "mongoose";
-import { info, measure } from "./utils.js";
+import { BLUE, info, measure, RESET } from "./utils.js";
+import ora from "ora";
 
 export class Registry {
   #documents: Map<string, Types.ObjectId[]>;
@@ -53,9 +54,15 @@ export class Registry {
         `Reference resolution failed: The model '${ref_model}' is not registered with Mongoose. Ensure the model is defined and registered before attempting to seed documents that reference it.`
       );
 
+    const loader = ora(
+      `${BLUE} [${Ref.modelName}] Loading reference documents for resolving ${parent.modelName} references ${RESET}`
+    ).start();
+
     const { result: docs, elapsed } = await measure.async(
       Ref.find({}, { _id: 1 }).lean()
     );
+
+    loader.stop();
 
     if (!docs.length)
       throw new Error(

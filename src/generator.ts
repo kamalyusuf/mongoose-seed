@@ -1,4 +1,4 @@
-import { Types, type AnyObject, type Model, type Schema } from "mongoose";
+import { Types, type AnyObject, type Model } from "mongoose";
 import type {
   ArrayConstraints,
   BigIntConstraints,
@@ -25,8 +25,15 @@ import { faker, type Faker } from "@faker-js/faker";
 import { createHash, randomUUID } from "node:crypto";
 import { contexts, generic } from "./string-matchers.js";
 import { registry } from "./registry.js";
+import type { SchemaAnalyzer } from "./schema-analyzer.js";
 
 export interface GeneratorOptions<T> {
+  labels: {
+    timestamps: {
+      created?: string;
+      updated?: string;
+    };
+  };
   timestamps?: boolean;
   optional_field_probability?: number;
   generators?: {
@@ -40,27 +47,29 @@ export interface GeneratorOptions<T> {
 }
 
 export class Generator<T> {
-  #schema: Schema;
-
   #doc: AnyObject;
-
-  #labels: {
-    created?: string;
-    updated?: string;
-  };
 
   #timestamp?: Date;
 
-  #options?: GeneratorOptions<T>;
+  #options: GeneratorOptions<T>;
 
   #model: Model<any>;
 
-  constructor(model: Model<any>, options?: GeneratorOptions<T>) {
+  #analyzer: SchemaAnalyzer<T>;
+
+  constructor(
+    model: Model<any>,
+    analyzer: SchemaAnalyzer<T>,
+    options: GeneratorOptions<T>
+  ) {
     this.#model = model;
-    this.#schema = model.schema;
+    this.#analyzer = analyzer;
     this.#doc = {};
-    this.#labels = this.#extract_timestamp_labels();
     this.#options = options;
+  }
+
+  get timestamp_labels() {
+    return this.#options.labels.timestamps;
   }
 
   async generate(constraints: SchemaConstraints): Promise<AnyObject> {
@@ -72,7 +81,11 @@ export class Generator<T> {
       if (this.#has_field_dependencies(constraint))
         this.#doc[path] = await this.#resolve_value(constraint);
 
-    if (Object.keys(this.#labels).length > 0) this.#resolve_timestamps();
+    if (
+      (this.#options.timestamps ?? true) &&
+      Object.keys(this.timestamp_labels).length > 0
+    )
+      this.#resolve_timestamps();
 
     return this.#doc;
   }
@@ -89,7 +102,7 @@ export class Generator<T> {
 
     if (!this.#should_generate(constraints)) return undefined;
 
-    if (this.#is_timestamp_field(constraints.path)) return undefined;
+    if (this.#analyzer.is_timestamp_field(constraints.path)) return undefined;
 
     if ((this.#options?.generators as AnyObject)?.[constraints.path])
       return (this.#options?.generators as AnyObject)[constraints.path]?.(
@@ -461,7 +474,7 @@ export class Generator<T> {
   }
 
   #should_generate(constraints: FieldConstraints): boolean {
-    if (this.#is_timestamp_field(constraints.path)) return true;
+    if (this.#analyzer.is_timestamp_field(constraints.path)) return true;
 
     if (typeof constraints.required === "function")
       return this.#evaluate_with_context(constraints.required);
@@ -498,42 +511,28 @@ export class Generator<T> {
         this.#proxify_doc() as any
       );
 
-      if (this.#labels.created && fields[this.#labels.created])
-        this.#doc[this.#labels.created] = fields[this.#labels.created];
+      if (
+        this.timestamp_labels.created &&
+        fields[this.timestamp_labels.created]
+      )
+        this.#doc[this.timestamp_labels.created] =
+          fields[this.timestamp_labels.created];
 
-      if (this.#labels.updated && fields[this.#labels.updated])
-        this.#doc[this.#labels.updated] = fields[this.#labels.updated];
+      if (
+        this.timestamp_labels.updated &&
+        fields[this.timestamp_labels.updated]
+      )
+        this.#doc[this.timestamp_labels.updated] =
+          fields[this.timestamp_labels.updated];
     } else if (this.#options?.timestamps) {
       const timestamp = this.#document_timestamp();
 
-      if (this.#labels.created) this.#doc[this.#labels.created] = timestamp;
+      if (this.timestamp_labels.created)
+        this.#doc[this.timestamp_labels.created] = timestamp;
 
-      if (this.#labels.updated) this.#doc[this.#labels.updated] = timestamp;
+      if (this.timestamp_labels.updated)
+        this.#doc[this.timestamp_labels.updated] = timestamp;
     }
-  }
-
-  #extract_timestamp_labels(): { created?: string; updated?: string } {
-    const options = this.#schema.get("timestamps");
-
-    if (options === true)
-      return {
-        created: "createdAt",
-        updated: "updatedAt"
-      };
-
-    if (!options) return {};
-
-    const fields: { created?: string; updated?: string } = {};
-
-    if (typeof options.createdAt === "string")
-      fields.created = options.createdAt;
-    else if (options.createdAt === true) fields.created = "createdAt";
-
-    if (typeof options.updatedAt === "string")
-      fields.updated = options.updatedAt;
-    else if (options.updatedAt === true) fields.updated = "updatedAt";
-
-    return fields;
   }
 
   #document_timestamp(): Date {
@@ -544,10 +543,6 @@ export class Generator<T> {
       });
 
     return this.#timestamp;
-  }
-
-  #is_timestamp_field(path: string): boolean {
-    return this.#labels.created === path || this.#labels.updated === path;
   }
 
   #lorem(min: number, max: number): string {

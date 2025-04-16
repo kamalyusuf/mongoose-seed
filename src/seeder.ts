@@ -8,14 +8,28 @@ import {
   measure,
   format_memory,
   warning,
-  memory_usage
+  memory_usage,
+  BLUE,
+  RESET
 } from "./utils.js";
 import { registry } from "./registry.js";
+import { OpenAIGenerator, type OpenAIConfig } from "./openai-generator.js";
+import ora, { type Ora } from "ora";
 
-export interface SeedConfig<T> extends AnalyzerOptions<T>, GeneratorOptions<T> {
+export interface SeedConfig<T>
+  extends AnalyzerOptions<T>,
+    Omit<GeneratorOptions<T>, "labels"> {
   quantity: number | [min: number, max: number];
   clean?: boolean;
   debug?: boolean;
+  openai?: Omit<
+    OpenAIConfig,
+    | "exclude"
+    | "timestamps"
+    | "optional_field_probability"
+    | "quantity"
+    | "constraints"
+  >;
 }
 
 export const seed = async <T>(
@@ -30,14 +44,24 @@ export const seed = async <T>(
     if (current > peak_memory) peak_memory = current;
   };
 
-  if (!debug) info(`[${model.modelName}] Cooking`);
+  let cooker: Ora | undefined;
+
+  if (!debug)
+    cooker = ora(`${BLUE} [${model.modelName}] Cooking${RESET}`).start();
 
   const start = performance.now();
 
   if (options.clean) {
-    if (debug) info(`[${model.modelName}] Cleaning collection`);
+    let cleaner: Ora | undefined;
+
+    if (debug)
+      cleaner = ora(
+        `${BLUE} [${model.modelName}] Cleaning collection${RESET}`
+      ).start();
 
     const { result, elapsed } = await measure.async(model.deleteMany({}));
+
+    cleaner?.stop();
 
     if (debug) {
       update_peak_memory();
@@ -52,7 +76,9 @@ export const seed = async <T>(
     }
   }
 
-  const analyzer = new SchemaAnalyzer({ exclude: options.exclude });
+  const analyzer = new SchemaAnalyzer(model.schema, {
+    exclude: options.exclude
+  });
 
   const constraints = analyzer.constraints(model.schema);
 
@@ -63,42 +89,62 @@ export const seed = async <T>(
   const interval = Math.max(1, Math.floor(quantity / 10));
   let last_memory_log = 0;
 
-  const documents = await measure.async(async () => {
-    const docs: AnyObject[] = [];
+  const documents = options.openai?.apikey
+    ? await measure.async(async () => {
+        const config = options.openai!;
 
-    for (let index = 0; index < quantity; index++) {
-      docs.push(
-        await new Generator<T>(model, {
-          generators: options.generators,
+        return await new OpenAIGenerator(model, analyzer, {
+          apikey: config.apikey,
+          quantity,
+          constraints,
+          description: config.description,
+          exclude: options.exclude as string[] | undefined,
+          max_tokens: config.max_tokens,
+          model: config.model,
+          temperature: config.temperature,
           timestamps: options.timestamps,
           optional_field_probability: options.optional_field_probability
-        }).generate(constraints)
-      );
+        }).generate();
+      })
+    : await measure.async(async () => {
+        const docs: AnyObject[] = [];
 
-      if (debug) update_peak_memory();
-
-      if (debug && (index % interval === 0 || index === quantity - 1)) {
-        const progress = (((index + 1) / quantity) * 100).toFixed(1);
-
-        const now = Date.now();
-        if (index % (interval * 5) === 0 || now - last_memory_log > 5000) {
-          const mem = memory_usage();
-
-          warning(
-            `[${model.modelName}] Memory - Heap: ${mem.heapUsed}, RSS: ${mem.rss}`
+        for (let index = 0; index < quantity; index++) {
+          docs.push(
+            await new Generator<T>(model, analyzer, {
+              generators: options.generators,
+              timestamps: options.timestamps,
+              optional_field_probability: options.optional_field_probability,
+              labels: analyzer.labels
+            }).generate(constraints)
           );
 
-          last_memory_log = now;
+          if (debug) update_peak_memory();
+
+          if (debug && (index % interval === 0 || index === quantity - 1)) {
+            const progress = (((index + 1) / quantity) * 100).toFixed(1);
+
+            const now = Date.now();
+            if (index % (interval * 5) === 0 || now - last_memory_log > 5000) {
+              const mem = memory_usage();
+
+              warning(
+                `[${model.modelName}] Memory - Heap: ${mem.heapUsed}, RSS: ${mem.rss}`
+              );
+
+              last_memory_log = now;
+            }
+
+            info(
+              `[${model.modelName}] Progress: ${(index + 1).toLocaleString()}/${quantity.toLocaleString()} documents generated (${progress}%)`
+            );
+          }
         }
 
-        info(
-          `[${model.modelName}] Progress: ${(index + 1).toLocaleString()}/${quantity.toLocaleString()} documents generated (${progress}%)`
-        );
-      }
-    }
+        return docs;
+      });
 
-    return docs;
-  });
+  let inserter: Ora | undefined;
 
   if (debug) {
     success(
@@ -109,9 +155,9 @@ export const seed = async <T>(
       `[${model.modelName}] Peak memory during generation: ${format_memory(peak_memory)}`
     );
 
-    info(
-      `[${model.modelName}] Inserting ${quantity.toLocaleString()} documents`
-    );
+    inserter = ora(
+      `${BLUE} [${model.modelName}] Inserting ${quantity.toLocaleString()} documents${RESET}`
+    ).start();
   }
 
   const result = await measure.async(
@@ -120,6 +166,9 @@ export const seed = async <T>(
       ordered: false
     })
   );
+
+  cooker?.stop();
+  inserter?.stop();
 
   if (debug) {
     update_peak_memory();
@@ -138,7 +187,11 @@ export const seed = async <T>(
 
   const end = performance.now();
 
-  info(`[${model.modelName}] Total time elapsed ${end - start}ms`);
+  if (debug) info(`[${model.modelName}] Total time elapsed ${end - start}ms`);
+  else
+    success(
+      `[${model.modelName}] Seeded ${result.result.insertedCount.toLocaleString()} / ${quantity.toLocaleString()} documents in ${end - start}ms`
+    );
 
   registry.register(model.modelName, Object.values(result.result.insertedIds));
 

@@ -1,11 +1,13 @@
 # Mongoose Seed
 
-A powerful utility for seeding Mongoose models with realistic fake data using Faker.js.
+A powerful utility for seeding Mongoose models with realistic fake data using Faker.js and optional OpenAI integration.
+
 Perfect for testing, development, and populating your database with mock data.
 
 ## Features
 
 - 🎲 Faker-powered data generation
+- 🤖 OpenAI integration for AI-generated realistic data
 - 📊 Supports all Mongoose schema types
 - 🎯 Fully respects your Mongoose schema options (e.g., `required`, `default`, `enum`, `min`, `max`, etc.)
 - 🪆 Handles complex nested structures, Maps, arrays, and embedded documents
@@ -19,13 +21,19 @@ Perfect for testing, development, and populating your database with mock data.
 
 ```bash
 npm install @kamalyb/mongoose-seed -D
+
 # or
+
 yarn add @kamalyb/mongoose-seed -D
+
 # or
+
 pnpm add @kamalyb/mongoose-seed -D
 ```
 
 ## Usage
+
+### Basic Usage
 
 ```typescript
 import mongoose from "mongoose";
@@ -128,6 +136,33 @@ await seed(Test, {
 await mongoose.disconnect();
 ```
 
+### OpenAI Integration
+
+Generate even more realistic data using OpenAI's language models. Simply provide your API key and let AI create contextually appropriate content for your models:
+
+```typescript
+await seed(Post, {
+  quantity: 100,
+  openai: {
+    apikey: "your-openai-api-key",
+    description: "A blog post model with title, content, and tags",
+    model: "gpt-4.1",
+    temperature: 0.7,
+    max_tokens: 2048
+  }
+});
+```
+
+The `openai` configuration object accepts the following properties:
+
+| Property    | Type   | Required | Default   | Description                                                                           |
+| ----------- | ------ | -------- | --------- | ------------------------------------------------------------------------------------- |
+| apikey      | string | Yes      | -         | Your OpenAI API key                                                                   |
+| description | string | No       | -         | Additional context about your model/schema/fields to help generate more accurate data |
+| model       | string | No       | "gpt-4.1" | OpenAI model to use                                                                   |
+| temperature | number | No       | 0.7       | Controls randomness (0.0-1.0)                                                         |
+| max_tokens  | number | No       | 2048      | Maximum token limit for generation                                                    |
+
 ## Behaviors
 
 1. Documents are inserted into the database using `Model.insertyMany()`.
@@ -152,3 +187,8 @@ To resolve this, try reducing the quantity parameter to a smaller value — 5,00
 is often a safe range for complex documents. For very large datasets with deeply
 nested structures, consider making multiple calls to the `seed()` function,
 each with a smaller quantity, to stay within the BSON size limits.
+
+### ObjectId References with OpenAI Integration
+
+When using the OpenAI integration, automatic resolution of ObjectId references is
+not possible. Instead, random ObjectIds will be generated for reference fields.
