@@ -27,7 +27,7 @@ import { contexts, generic } from "./string-matchers.js";
 import { registry } from "./registry.js";
 import type { SchemaAnalyzer } from "./schema-analyzer.js";
 
-export interface GeneratorOptions<T> {
+export interface GeneratorOptions<T, U = Omit<T, "_id" | "__v">> {
   labels: {
     timestamps: {
       created?: string;
@@ -37,11 +37,11 @@ export interface GeneratorOptions<T> {
   timestamps?: boolean;
   optional_field_probability?: number;
   generators?: {
-    [K in keyof T]?: GeneratorFn<T[K]>;
+    [K in keyof U]?: GeneratorFn<U[K]>;
   } & {
     timestamps?: (
       faker: Faker,
-      doc: Partial<{ [Key in keyof T]: LeanValue<T[Key]> }>
+      doc: Partial<{ [Key in keyof U]: LeanValue<U[Key]> }>
     ) => Record<string, Date>;
   };
 }
@@ -180,56 +180,57 @@ export class Generator<T> {
   #number(constraints: NumberConstraints): number {
     if (constraints.enum) return faker.helpers.arrayElement(constraints.enum);
 
+    if (constraints.min !== undefined || constraints.max !== undefined)
+      return faker.number.int({
+        min: constraints.min ?? Number.MIN_SAFE_INTEGER,
+        max: constraints.max ?? Number.MAX_SAFE_INTEGER
+      });
+
+    let min = Number.MIN_SAFE_INTEGER;
+    let max = Number.MAX_SAFE_INTEGER;
     let precision = 0;
-    const defaults = {
-      min: Number.MIN_SAFE_INTEGER,
-      max: Number.MAX_SAFE_INTEGER
-    };
 
     if (/age/i.test(constraints.path)) {
-      defaults.min = 18;
-      defaults.max = 90;
+      min = 18;
+      max = 90;
       precision = 0;
     } else if (/year/i.test(constraints.path)) {
-      defaults.min = 1970;
-      defaults.max = 2025;
+      min = 1970;
+      max = new Date().getFullYear();
       precision = 0;
     } else if (/(rating|score)/i.test(constraints.path)) {
-      defaults.min = 1;
-      defaults.max = 5;
+      min = 1;
+      max = 5;
       precision = 1;
     } else if (/(percent|percentage)/i.test(constraints.path)) {
-      defaults.min = 0;
-      defaults.max = 100;
+      min = 0;
+      max = 100;
       precision = 2;
     } else if (/(price|cost|amount)/i.test(constraints.path)) {
-      defaults.min = 0.99;
-      defaults.max = 999.99;
+      min = 0.99;
+      max = 999.99;
       precision = 2;
     } else if (/(quantity|count|stock)/i.test(constraints.path)) {
-      defaults.min = 0;
-      defaults.max = 100;
+      min = 0;
+      max = 100;
       precision = 0;
     } else if (/(weight)/i.test(constraints.path)) {
-      defaults.min = 0.1;
-      defaults.max = 100;
+      min = 0.1;
+      max = 100;
       precision = 2;
     } else if (/(height|width|length|depth)/i.test(constraints.path)) {
-      defaults.min = 1;
-      defaults.max = 200;
+      min = 1;
+      max = 200;
       precision = 1;
     } else if (/(latitude|lat)/i.test(constraints.path)) {
-      defaults.min = -90;
-      defaults.max = 90;
+      min = -90;
+      max = 90;
       precision = 6;
     } else if (/(longitude|long)/i.test(constraints.path)) {
-      defaults.min = -180;
-      defaults.max = 180;
+      min = -180;
+      max = 180;
       precision = 6;
     }
-
-    const min = constraints.min ?? defaults.min;
-    const max = constraints.max ?? defaults.max;
 
     return faker.number.float({ min, max, fractionDigits: precision });
   }
@@ -240,8 +241,8 @@ export class Generator<T> {
 
   #double(constraints: DoubleConstraints): number {
     let min = 0;
-    let max = 0;
-    let precision = 0;
+    let max = 100_000;
+    let precision = 2;
 
     if (/(rating|score)/i.test(constraints.path)) {
       min = 1;
@@ -318,11 +319,11 @@ export class Generator<T> {
     );
   }
 
-  #int32(_constraints: Int32Constraints) {
+  #int32(_constraints: Int32Constraints): number {
     return faker.number.int({ min: -1_000_000, max: 1_000_000 });
   }
 
-  async #objectid(constraints: ObjectIdConstraints) {
+  async #objectid(constraints: ObjectIdConstraints): Promise<Types.ObjectId> {
     if (!constraints.ref) return new Types.ObjectId();
 
     const ref = this.#resolve_ref_model(constraints.ref);

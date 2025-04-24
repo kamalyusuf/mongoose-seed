@@ -34,9 +34,9 @@ export interface SeedConfig<T>
 
 export const seed = async <T>(
   model: Model<T>,
-  options: SeedConfig<T>
+  config: SeedConfig<T>
 ): Promise<InsertManyResult<T>> => {
-  const debug = options.debug ?? true;
+  const debug = config.debug ?? true;
   let peak_memory = 0;
 
   const update_peak_memory = () => {
@@ -51,7 +51,7 @@ export const seed = async <T>(
 
   const start = performance.now();
 
-  if (options.clean) {
+  if (config.clean) {
     let cleaner: Ora | undefined;
 
     if (debug)
@@ -77,33 +77,33 @@ export const seed = async <T>(
   }
 
   const analyzer = new SchemaAnalyzer(model.schema, {
-    exclude: options.exclude
+    exclude: config.exclude
   });
 
   const constraints = analyzer.constraints(model.schema);
 
-  const quantity = Array.isArray(options.quantity)
-    ? faker.number.int({ min: options.quantity[0], max: options.quantity[1] })
-    : options.quantity;
+  const quantity = Array.isArray(config.quantity)
+    ? faker.number.int({ min: config.quantity[0], max: config.quantity[1] })
+    : config.quantity;
 
   const interval = Math.max(1, Math.floor(quantity / 10));
   let last_memory_log = 0;
 
-  const documents = options.openai?.apikey
+  const documents = config.openai?.apikey
     ? await measure.async(async () => {
-        const config = options.openai!;
+        const openai = config.openai!;
 
         return await new OpenAIGenerator(model, analyzer, {
-          apikey: config.apikey,
+          apikey: openai.apikey,
           quantity,
           constraints,
-          description: config.description,
-          exclude: options.exclude as string[] | undefined,
-          max_tokens: config.max_tokens,
-          model: config.model,
-          temperature: config.temperature,
-          timestamps: options.timestamps,
-          optional_field_probability: options.optional_field_probability
+          description: openai.description,
+          exclude: config.exclude as string[] | undefined,
+          max_tokens: openai.max_tokens,
+          model: openai.model,
+          temperature: openai.temperature,
+          timestamps: config.timestamps,
+          optional_field_probability: config.optional_field_probability
         }).generate();
       })
     : await measure.async(async () => {
@@ -112,9 +112,9 @@ export const seed = async <T>(
         for (let index = 0; index < quantity; index++) {
           docs.push(
             await new Generator<T>(model, analyzer, {
-              generators: options.generators,
-              timestamps: options.timestamps,
-              optional_field_probability: options.optional_field_probability,
+              generators: config.generators,
+              timestamps: config.timestamps,
+              optional_field_probability: config.optional_field_probability,
               labels: analyzer.labels
             }).generate(constraints)
           );

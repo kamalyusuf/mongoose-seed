@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import type { Faker } from "@faker-js/faker";
 import type { AnyObject, Model, Schema, Types } from "mongoose";
 
@@ -112,24 +113,31 @@ export interface MixedConstraints extends AbstractConstraints<any> {
 
 export type LeanValue<T> =
   T extends Types.DocumentArray<infer U>
-    ? U[]
-    : T extends Map<infer K, infer V>
-      ? Record<K extends PropertyKey ? K : never, V>
-      : T extends typeof Schema.Types.Mixed
-        ? any
-        : T extends
-              | Date
-              | Types.ObjectId
-              | Buffer
-              | Types.Decimal128
-              | typeof Schema.Types.UUID
-              | BigInt
-              | Types.Double
-              | typeof Schema.Types.Int32
-          ? T
-          : T extends AnyObject
-            ? ExtractObjectWithoutIndexSignature<T>
-            : T;
+    ? LeanValue<U>[]
+    : T extends mongoose.Schema<any, any, any>
+      ? LeanValue<mongoose.InferSchemaType<T>>
+      : T extends Map<infer K, infer V>
+        ? Record<K extends PropertyKey ? K : never, LeanValue<V>>
+        : T extends typeof Schema.Types.Mixed
+          ? any
+          : T extends
+                | Date
+                | Types.ObjectId
+                | Buffer
+                | mongoose.mongo.Binary
+                | Types.Decimal128
+                | typeof Schema.Types.UUID
+                | BigInt
+                | Types.Double
+                | typeof Schema.Types.Int32
+            ? T
+            : T extends AnyObject
+              ? ExtractObjectWithoutIndexSignature<{
+                  [K in keyof T as K extends "_id" | "__v"
+                    ? never
+                    : K]: LeanValue<T[K]>;
+                }>
+              : T;
 
 export type GeneratorFn<T> = (faker: Faker) => LeanValue<T>;
 
@@ -140,3 +148,7 @@ type ExtractObjectWithoutIndexSignature<T> = T extends any
       ? never
       : T
   : never;
+
+export type Prettify<T> = {
+  [K in keyof T]: T[K];
+} & {};
