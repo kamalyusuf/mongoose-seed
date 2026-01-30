@@ -1,6 +1,6 @@
 # Mongoose Seed
 
-A powerful utility for seeding Mongoose models with realistic fake data using Faker.js and optional OpenAI integration.
+A powerful utility for seeding Mongoose models with realistic fake data using Faker.js.
 
 Perfect for testing, development, and populating your database with mock data.
 
