@@ -1012,7 +1012,7 @@ export const contexts: ContextBias[] = [
             "export"
           ])
       ],
-      [/\b(actor|user)\b/i, faker.internet.userName],
+      [/\b(actor|user)\b/i, faker.internet.username],
       [/\b(ip_address)\b/i, faker.internet.ip],
       [/\b(resource|target)\b/i, faker.system.fileName],
       [/\b(timestamp|time)\b/i, () => faker.date.recent().toISOString()],

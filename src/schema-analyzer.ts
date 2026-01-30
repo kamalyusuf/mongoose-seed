@@ -46,12 +46,13 @@ export class SchemaAnalyzer<T> {
           default: options.default,
           required,
           set: options.set,
-          schema: this.constraints(type.schema)
+          schema: this.constraints((type as any).schema)
         };
       else if (type.instance === "Array") {
-        const caster = (type as AnyObject).caster;
+        // In Mongoose v9, use embeddedSchemaType instead of caster
+        const embedded_schema_type = (type as AnyObject).embeddedSchemaType;
 
-        if (caster.schema)
+        if (embedded_schema_type.schema)
           // Array of documents
           constraint[path] = {
             path,
@@ -59,9 +60,9 @@ export class SchemaAnalyzer<T> {
             required,
             default: options.default,
             set: options.set,
-            of: this.constraints(caster.schema)
+            of: this.constraints(embedded_schema_type.schema)
           };
-        else if (caster.instance === "Array")
+        else if (embedded_schema_type.instance === "Array")
           // Nested array (e.g., [[Number]])
           constraint[path] = {
             path,
@@ -69,19 +70,19 @@ export class SchemaAnalyzer<T> {
             required,
             default: options.default,
             set: options.set,
-            of: this.#nested_array(caster)
+            of: this.#nested_array(embedded_schema_type)
           };
         else {
-          // Simple array (e.g., [Number])
           constraint[path] = {
             path,
             type: type.instance,
             required,
             set: options.set,
-            of: caster.instance,
+            of: embedded_schema_type.instance,
             ref:
-              caster.instance === "ObjectId" && caster.options.ref
-                ? caster.options.ref
+              embedded_schema_type.instance === "ObjectId" &&
+              embedded_schema_type.options.ref
+                ? embedded_schema_type.options.ref
                 : undefined
           };
         }
@@ -236,8 +237,8 @@ export class SchemaAnalyzer<T> {
     );
   }
 
-  #nested_array(caster: AnyObject) {
-    const nested = caster.caster;
+  #nested_array(embedded_schema_type: AnyObject) {
+    const nested = embedded_schema_type.embeddedSchemaType;
     const constraint: ArrayConstraints = {
       type: "Array",
       path: nested.path,

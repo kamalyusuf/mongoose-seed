@@ -1,4 +1,4 @@
-export const measure = <T>(fn: () => T): { result: T; elapsed: number } => {
+export const gauge = <T>(fn: () => T): { result: T; elapsed: number } => {
   const start = performance.now();
 
   const result = fn();
@@ -8,7 +8,7 @@ export const measure = <T>(fn: () => T): { result: T; elapsed: number } => {
   return { result, elapsed: end - start };
 };
 
-measure.async = async <T>(arg: Promise<T> | (() => Promise<T>)) => {
+gauge.async = async <T>(arg: Promise<T> | (() => Promise<T>)) => {
   const start = performance.now();
 
   const result = typeof arg === "function" ? await arg() : await arg;

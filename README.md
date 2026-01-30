@@ -6,16 +6,15 @@ Perfect for testing, development, and populating your database with mock data.
 
 ## Features
 
-- 🎲 Faker-powered data generation
-- 🤖 OpenAI integration for AI-generated realistic data
-- 📊 Supports all Mongoose schema types
-- 🎯 Fully respects your Mongoose schema options (e.g., `required`, `default`, `enum`, `min`, `max`, etc.)
-- 🪆 Handles complex nested structures, Maps, arrays, and embedded documents
-- ⏱️ Supports automatic and custom timestamp generation
-- 📈 Includes debug mode with memory tracking and progress logging
-- 📝 Realistic data based on model and field names
-- 🔧 Customizable field generators
-- 🔗 Automatic resolution of ObjectId references (including arrays of references)
+- Faker-powered data generation
+- Supports all Mongoose schema types
+- Fully respects your Mongoose schema options (e.g., `required`, `default`, `enum`, `min`, `max`, etc.)
+- Handles complex nested structures, Maps, arrays, and embedded documents
+- Supports automatic and custom timestamp generation
+- Includes debug mode with memory tracking and progress logging
+- Realistic data based on model and field names
+- Customizable field generators
+- Automatic resolution of ObjectId references (including arrays of references)
 
 ## Installation
 
@@ -136,32 +135,65 @@ await seed(Test, {
 await mongoose.disconnect();
 ```
 
-### OpenAI Integration
+### Handling Model References
 
-Generate even more realistic data using OpenAI's language models. Simply provide your API key and let AI create contextually appropriate content for your models:
+When your models reference other models via ObjectId fields, the seeder automatically handles this through an internal registry system. Here's how it works:
 
 ```typescript
+import mongoose from "mongoose";
+import { seed } from "@kamalyb/mongoose-seed";
+
+const UserSchema = new mongoose.Schema({
+  name: String,
+  email: String,
+  role: String
+});
+
+const User = mongoose.model("User", UserSchema);
+
+const PostSchema = new mongoose.Schema({
+  title: String,
+  content: String,
+  author: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
+  contributors: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    }
+  ]
+});
+
+const Post = mongoose.model("Post", PostSchema);
+
+await mongoose.connect();
+
+await seed(User, {
+  quantity: 50,
+  clean: true
+});
+
 await seed(Post, {
   quantity: 100,
-  openai: {
-    apikey: "your-openai-api-key",
-    description: "A blog post model with title, content, and tags",
-    model: "gpt-4.1",
-    temperature: 0.7,
-    max_tokens: 2048
-  }
+  clean: true
 });
+
+await mongoose.disconnect();
 ```
 
-The `openai` configuration object accepts the following properties:
+**How it works:**
 
-| Property    | Type   | Required | Default   | Description                                                                           |
-| ----------- | ------ | -------- | --------- | ------------------------------------------------------------------------------------- |
-| apikey      | string | Yes      | -         | Your OpenAI API key                                                                   |
-| description | string | No       | -         | Additional context about your model/schema/fields to help generate more accurate data |
-| model       | string | No       | "gpt-4.1" | OpenAI model to use                                                                   |
-| temperature | number | No       | 0.7       | Controls randomness (0.0-1.0)                                                         |
-| max_tokens  | number | No       | 2048      | Maximum token limit for generation                                                    |
+1. When you seed the `User` model, all generated user ids are cached in an internal registry (within the current node process)
+2. When you seed the `Post` model:
+   - The seeder detects that `author` field references a User (via the `ref` property)
+   - It checks the internal registry cache for user ids
+   - It randomly selects from the cached user ids for each post
+   - For array fields like `contributors`, it randomly selects multiple user ids
+3. If a referenced model wasn't seeded in the current node process, the seeder will automatically query the database to load existing documents from that collection
+
+As long as you seed referenced models first within the same process, the seeder uses cached ids.
 
 ## Behaviors
 
@@ -187,8 +219,3 @@ To resolve this, try reducing the quantity parameter to a smaller value — 5,00
 is often a safe range for complex documents. For very large datasets with deeply
 nested structures, consider making multiple calls to the `seed()` function,
 each with a smaller quantity, to stay within the BSON size limits.
-
-### ObjectId References with OpenAI Integration
-
-When using the OpenAI integration, automatic resolution of ObjectId references is
-not possible. Instead, random ObjectIds will be generated for reference fields.

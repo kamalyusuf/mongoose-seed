@@ -70,17 +70,15 @@ const Stuff = mongoose.model("Stuff", schema);
 await mongoose.connect("mongodb://localhost:27017/mongoose-seeder");
 
 try {
-  const result = await seed(Stuff, {
-    quantity: 100,
+  await seed(Stuff, {
+    quantity: [100, 1000],
     clean: true,
     exclude: [],
-    debug: true,
+    debug: false,
     timestamps: true,
-    optional_field_probability: 1,
+    optional_field_probability: 0.5,
     generators: {}
   });
-
-  // console.log(result.mongoose);
 } catch (e) {
   const error = e as Error;
 

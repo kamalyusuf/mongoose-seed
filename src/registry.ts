@@ -1,6 +1,6 @@
 import { faker } from "@faker-js/faker";
 import type { Model, Types } from "mongoose";
-import { BLUE, info, measure, RESET } from "./utils.js";
+import { BLUE, info, gauge, RESET } from "./utils.js";
 import ora from "ora";
 
 export class Registry {
@@ -58,7 +58,7 @@ export class Registry {
       `${BLUE} [${Ref.modelName}] Loading reference documents for resolving ${parent.modelName} references ${RESET}`
     ).start();
 
-    const { result: docs, elapsed } = await measure.async(
+    const { result: docs, elapsed } = await gauge.async(
       Ref.find({}, { _id: 1 }).lean()
     );
 

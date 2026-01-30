@@ -5,35 +5,25 @@ import { faker } from "@faker-js/faker";
 import {
   info,
   success,
-  measure,
   format_memory,
   warning,
   memory_usage,
   BLUE,
-  RESET
+  RESET,
+  gauge
 } from "./utils.js";
 import { registry } from "./registry.js";
-import { OpenAIGenerator, type OpenAIConfig } from "./openai-generator.js";
 import ora, { type Ora } from "ora";
 
 export interface SeedConfig<T>
-  extends AnalyzerOptions<T>,
-    Omit<GeneratorOptions<T>, "labels"> {
+  extends AnalyzerOptions<T>, Omit<GeneratorOptions<T>, "labels"> {
   quantity: number | [min: number, max: number];
   clean?: boolean;
   debug?: boolean;
-  openai?: Omit<
-    OpenAIConfig,
-    | "exclude"
-    | "timestamps"
-    | "optional_field_probability"
-    | "quantity"
-    | "constraints"
-  >;
 }
 
 export const seed = async <T>(
-  model: Model<T>,
+  model: Model<T, any, any, any, any>,
   config: SeedConfig<T>
 ): Promise<InsertManyResult<T>> => {
   const debug = config.debug ?? true;
@@ -59,7 +49,9 @@ export const seed = async <T>(
         `${BLUE} [${model.modelName}] Cleaning collection${RESET}`
       ).start();
 
-    const { result, elapsed } = await measure.async(model.deleteMany({}));
+    const { result, elapsed } = await gauge.async<
+      Awaited<ReturnType<typeof model.deleteMany>>
+    >(model.deleteMany({}));
 
     cleaner?.stop();
 
@@ -89,60 +81,43 @@ export const seed = async <T>(
   const interval = Math.max(1, Math.floor(quantity / 10));
   let last_memory_log = 0;
 
-  const documents = config.openai?.apikey
-    ? await measure.async(async () => {
-        const openai = config.openai!;
+  const documents = await gauge.async(async () => {
+    const docs: AnyObject[] = [];
 
-        return await new OpenAIGenerator(model, analyzer, {
-          apikey: openai.apikey,
-          quantity,
-          constraints,
-          description: openai.description,
-          exclude: config.exclude as string[] | undefined,
-          max_tokens: openai.max_tokens,
-          model: openai.model,
-          temperature: openai.temperature,
+    for (let index = 0; index < quantity; index++) {
+      docs.push(
+        await new Generator<T>(model, analyzer, {
+          generators: config.generators,
           timestamps: config.timestamps,
-          optional_field_probability: config.optional_field_probability
-        }).generate();
-      })
-    : await measure.async(async () => {
-        const docs: AnyObject[] = [];
+          optional_field_probability: config.optional_field_probability,
+          labels: analyzer.labels
+        }).generate(constraints)
+      );
 
-        for (let index = 0; index < quantity; index++) {
-          docs.push(
-            await new Generator<T>(model, analyzer, {
-              generators: config.generators,
-              timestamps: config.timestamps,
-              optional_field_probability: config.optional_field_probability,
-              labels: analyzer.labels
-            }).generate(constraints)
+      if (debug) update_peak_memory();
+
+      if (debug && (index % interval === 0 || index === quantity - 1)) {
+        const progress = (((index + 1) / quantity) * 100).toFixed(1);
+
+        const now = Date.now();
+        if (index % (interval * 5) === 0 || now - last_memory_log > 5000) {
+          const mem = memory_usage();
+
+          warning(
+            `[${model.modelName}] Memory - Heap: ${mem.heapUsed}, RSS: ${mem.rss}`
           );
 
-          if (debug) update_peak_memory();
-
-          if (debug && (index % interval === 0 || index === quantity - 1)) {
-            const progress = (((index + 1) / quantity) * 100).toFixed(1);
-
-            const now = Date.now();
-            if (index % (interval * 5) === 0 || now - last_memory_log > 5000) {
-              const mem = memory_usage();
-
-              warning(
-                `[${model.modelName}] Memory - Heap: ${mem.heapUsed}, RSS: ${mem.rss}`
-              );
-
-              last_memory_log = now;
-            }
-
-            info(
-              `[${model.modelName}] Progress: ${(index + 1).toLocaleString()}/${quantity.toLocaleString()} documents generated (${progress}%)`
-            );
-          }
+          last_memory_log = now;
         }
 
-        return docs;
-      });
+        info(
+          `[${model.modelName}] Progress: ${(index + 1).toLocaleString()}/${quantity.toLocaleString()} documents generated (${progress}%)`
+        );
+      }
+    }
+
+    return docs;
+  });
 
   let inserter: Ora | undefined;
 
@@ -160,12 +135,15 @@ export const seed = async <T>(
     ).start();
   }
 
-  const result = await measure.async(
+  const result = await gauge.async(
     model.insertMany(documents.result, {
       rawResult: true,
       ordered: false
     })
   );
+
+  if (result.result.mongoose.validationErrors.length)
+    console.error(result.result.mongoose.validationErrors);
 
   cooker?.stop();
   inserter?.stop();
